@@ -1,15 +1,33 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useRef, useEffect, useState } from 'react';
-import { ScrollView, View, Text, PermissionsAndroid, TouchableOpacity } from 'react-native';
-import { NativeModules, StyleSheet, DeviceEventEmitter } from 'react-native';
+import { SafeAreaView, ScrollView, View, Text, PermissionsAndroid, TouchableOpacity } from 'react-native';
+import { Platform, StatusBar, NativeModules, StyleSheet, DeviceEventEmitter } from 'react-native';
 import CustomButton from './src/CustomButton';
+import notifee, { AndroidImportance } from '@notifee/react-native';
+
+const { AudioModule, BluetoothModule, BLEModule } = NativeModules;
 
 interface BluetoothDevice {
   id: string;
   name: string;
 }
 
-const { BluetoothModule, BLEModule } = NativeModules;
+
+async function displayNotification(newMessage: string) {
+  const channelId = await notifee.createChannel({
+    id: 'default',
+    name: 'Default Channel',
+    importance: AndroidImportance.HIGH,
+  });
+
+  await notifee.displayNotification({
+    title: 'ESP32C3',
+    body: newMessage,
+    android: {
+      channelId,
+    },
+  });
+}
 
 const requestBluetoothPermissions = async () => {
   try {
@@ -37,6 +55,29 @@ const App = () => {
   const scrollRef = useRef<ScrollView>(null);
   const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
   const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+  const [log, setLog] = useState<string[]>([]);
+  const [connectedAt, setConnectedAt] = useState<Date | null>(null);
+
+  const logEvent = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setLog(prev => [...prev.slice(-19), `${timestamp} - ${message}`]); // keep last 20 logs
+  };
+  const handleConnect = () => {
+    setConnectedAt(new Date());
+    logEvent('Connected');
+  };
+
+  const handleDisconnect = () => {
+    if (connectedAt) {
+      const duration = (Date.now() - connectedAt.getTime()) / 1000;
+      logEvent(`Disconnected (session ${duration.toFixed(1)}s)`);
+      setConnectedAt(null);
+    } else {
+      logEvent('Disconnected');
+    }
+  };
+
 
   const addMessage = (newMessage: string) => {
     console.log(newMessage);
@@ -108,25 +149,61 @@ const App = () => {
         // ✅ Wait for BLE connection state before subscribing
         setTimeout(() => {
           BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
-            .then(() => addMessage('Subscribed to BLE notifications'))
+            .then(() => {
+              addMessage('Subscribed to BLE notifications');
+              handleConnect();
+              AudioModule.playAudio('chime');
+              displayNotification('Subscribed');
+            })
             .catch((error: any) => addMessage(`BLE Subscription Error: ${error}`));
         }, 1000);  // Delay to ensure connection is fully established
       })
       .catch((error: any) => addMessage(`BLE Error: ${error}`));
   };
 
-
+  async function requestPermission() {
+    if (Platform.OS === 'android' && Number(Platform.Version) >= 33) {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        console.warn('Notification permission not granted');
+      }
+    }
+    await notifee.requestPermission();
+  }
   useEffect(() => {
     console.log('you are here');
+    requestPermission();
     checkBluetooth();
     ConnectSubscribe();
 
     console.log(DeviceEventEmitter);
 
     let bleSubscription = DeviceEventEmitter.addListener('BluetoothNotification', (message) => {
+      const timestamp = new Date().toLocaleTimeString();
       console.log('Received BLE Notification:', message);
       scrollRef.current?.scrollToEnd({ animated: true });
-      addMessage(message.message);  // Store the notification in your chat/messages
+      if ('message' in message) {
+        addMessage(message.message);  // Store the notification in your chat/messages
+
+      }
+      if (String(message.status).includes('Disconnected')) {
+        handleDisconnect();
+        AudioModule.playAudio('bing_bong');
+      }
+
+      const strMessage = String(message?.message) || '';
+      if (strMessage.includes('Not Charging')) {
+        displayNotification('Battery fully charged');
+      }
+      if (strMessage.includes('Voltage')) {
+        const matchResult = strMessage.match(/[\d.]+/);
+        if (matchResult) {
+          const voltageValue = parseFloat(matchResult[0]) * 2.475;
+          console.log(`[${timestamp}] Voltage: ${voltageValue.toFixed(2)}V`);
+        } else {
+          console.warn(`[${timestamp}] ⚠️ No voltage value found in message!`);
+        }
+      }
     });
 
     // Listen for Bluetooth Classic messages
@@ -164,77 +241,88 @@ const App = () => {
   };
 
   return (
-    <View>
-      <Text>Bluetooth Status: {enabled ? 'Enabled' : 'Disabled'}</Text>
-      <View style={{ margin: 20, padding: 10, backgroundColor: '#eee', height: 150 }}>
-        <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Console Messages:</Text>
-        <ScrollView style={{ maxHeight: 120 }} ref={scrollRef}>
-          {messages.map((msg, index) => (
-            <Text key={index}>{msg}</Text>
+    <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar translucent={true} backgroundColor="transparent" />
+      <View style={{ flex: 1, paddingTop: StatusBar.currentHeight }}>
+        <Text style={{ paddingLeft: 19, paddingTop: 5 }}>Bluetooth Status: {enabled ? 'Enabled' : 'Disabled'}</Text>
+        <View style={{ margin: 20, padding: 10, backgroundColor: '#eee', height: 150 }}>
+          <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Console Messages:</Text>
+          <ScrollView style={{ maxHeight: 120 }} ref={scrollRef}>
+            {messages.map((msg, index) => (
+              <Text key={index}>{msg}</Text>
+            ))}
+          </ScrollView>
+        </View>
+        <View style={styles.buttonGroup}>
+          <View style={styles.buttonRow}>
+            <CustomButton
+              title="Connect BLE"
+              onPress={ConnectSubscribe}
+              color="#FF5733"
+            />
+            <CustomButton
+              title="Scan Devices"
+              onPress={scanForDevices}
+              color="#FF5733"
+            />
+          </View>
+
+          <View style={styles.buttonRow}>
+            <CustomButton
+              title="Turn LED ON"
+              onPress={() => sendBluetoothMessage('LED_ON')}
+              color="#FF5733"
+            />
+            <CustomButton
+              title="Turn LED OFF"
+              onPress={() => sendBluetoothMessage('LED_OFF')}
+              color="#FF5733"
+            />
+          </View>
+          <View style={styles.buttonRow}>
+            <CustomButton
+              title="BLE LED ON"
+              onPress={() => sendBLEData('LED_ON')}
+              color="#005733"
+            />
+            <CustomButton
+              title="BLE LED OFF"
+              onPress={() => sendBLEData('LED_OFF')}
+              color="#005733"
+            />
+
+          </View>
+          <View style={styles.buttonRow}>
+            <CustomButton
+              title="Disconnect BLE"
+              onPress={() => disconnectBLE()}
+              color="#005733"
+            />
+          </View>
+        </View>
+        <View style={{ flex: 1, justifyContent: 'flex-end', padding: 10 }}>
+          <Text style={{ fontWeight: 'bold' }}>Connection Log:</Text>
+          <ScrollView style={{ maxHeight: 150 }}>
+            {log.map((entry, index) => (
+              <Text key={index} style={{ fontSize: 12 }}>{entry}</Text>
+            ))}
+          </ScrollView>
+        </View>
+
+        {selectedDevice && (
+          <CustomButton title="Connect" onPress={connectToSelectedDevice} color="#FF5733" />
+        )}
+        <ScrollView style={{ maxHeight: 200 }}>
+          {devices.map((item: any) => (
+            <TouchableOpacity key={item.id} onPress={() => setDevice(item)}>
+              <Text style={styles.textStyle}>
+                {item.name} ({item.id})
+              </Text>
+            </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
-      <View style={styles.buttonGroup}>
-        <View style={styles.buttonRow}>
-          <CustomButton
-            title="Connect BLE"
-            onPress={ConnectSubscribe}
-            color="#FF5733"
-          />
-          <CustomButton
-            title="Scan Devices"
-            onPress={scanForDevices}
-            color="#FF5733"
-          />
-        </View>
-
-        <View style={styles.buttonRow}>
-          <CustomButton
-            title="Turn LED ON"
-            onPress={() => sendBluetoothMessage('LED_ON')}
-            color="#FF5733"
-          />
-          <CustomButton
-            title="Turn LED OFF"
-            onPress={() => sendBluetoothMessage('LED_OFF')}
-            color="#FF5733"
-          />
-        </View>
-        <View style={styles.buttonRow}>
-          <CustomButton
-            title="BLE LED ON"
-            onPress={() => sendBLEData('LED_ON')}
-            color="#005733"
-          />
-          <CustomButton
-            title="BLE LED OFF"
-            onPress={() => sendBLEData('LED_OFF')}
-            color="#005733"
-          />
-
-        </View>
-        <View style={styles.buttonRow}>
-          <CustomButton
-            title="Disconnect BLE"
-            onPress={() => disconnectBLE()}
-            color="#005733"
-          />
-        </View>
-      </View>
-
-      {selectedDevice && (
-        <CustomButton title="Connect" onPress={connectToSelectedDevice} color="#FF5733" />
-      )}
-      <ScrollView style={{ maxHeight: 200 }}>
-        {devices.map((item: any) => (
-          <TouchableOpacity key={item.id} onPress={() => setDevice(item)}>
-            <Text style={styles.textStyle}>
-              {item.name} ({item.id})
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 };
 

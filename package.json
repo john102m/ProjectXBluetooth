@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@notifee/react-native": "^9.1.8",
     "jbluepack": "file:../shared_modules/jbluepack",
     "react": "19.0.0",
     "react-native": "0.79.1"
