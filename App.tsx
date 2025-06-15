@@ -12,7 +12,6 @@ interface BluetoothDevice {
   name: string;
 }
 
-
 async function displayNotification(newMessage: string) {
   const channelId = await notifee.createChannel({
     id: 'default',
@@ -55,6 +54,7 @@ const App = () => {
   const scrollRef = useRef<ScrollView>(null);
   const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
   const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+  const MAX_RECONNECTION_ATTEMPTS = 5;
 
   const [log, setLog] = useState<string[]>([]);
   const [connectedAt, setConnectedAt] = useState<Date | null>(null);
@@ -63,15 +63,16 @@ const App = () => {
     const timestamp = new Date().toLocaleTimeString();
     setLog(prev => [...prev.slice(-19), `${timestamp} - ${message}`]); // keep last 20 logs
   };
-  const handleConnect = () => {
+  const logConnection = () => {
     setConnectedAt(new Date());
     logEvent('Connected');
   };
 
-  const handleDisconnect = () => {
+  const logDisconnection = () => {
     if (connectedAt) {
       const duration = (Date.now() - connectedAt.getTime()) / 1000;
       logEvent(`Disconnected (session ${duration.toFixed(1)}s)`);
+      addMessage(`Disconnected (session ${duration.toFixed(1)}s)`);
       setConnectedAt(null);
     } else {
       logEvent('Disconnected');
@@ -93,26 +94,26 @@ const App = () => {
     }
   };
 
-  const enableBluetooth = async () => {
-    try {
-      await BluetoothModule.enableBluetooth();
-      setEnabled(true);
-    } catch (error) {
-      console.error('Error enabling Bluetooth:', error);
-    }
-  };
+  // const enableBluetooth = async () => {
+  //   try {
+  //     await BluetoothModule.enableBluetooth();
+  //     setEnabled(true);
+  //   } catch (error) {
+  //     console.error('Error enabling Bluetooth:', error);
+  //   }
+  // };
 
-  const scanForDevices = async () => {
-    try {
-      await requestBluetoothPermissions();
-      const foundDevices = await BluetoothModule.scanDevices();
-      console.log('Scanned Devices:', foundDevices);
-      setDevices(foundDevices);
-    } catch (error) {
+  // const scanForDevices = async () => {
+  //   try {
+  //     await requestBluetoothPermissions();
+  //     const foundDevices = await BluetoothModule.scanDevices();
+  //     console.log('Scanned Devices:', foundDevices);
+  //     setDevices(foundDevices);
+  //   } catch (error) {
 
-      addMessage(`Error scanning for devices: ${error}`);
-    }
-  };
+  //     addMessage(`Error scanning for devices: ${error}`);
+  //   }
+  // };
 
   const sendBluetoothMessage = async (message: string) => {
     try {
@@ -142,21 +143,23 @@ const App = () => {
     addMessage(`Selected: ${item.name}`);
   };
 
-  const ConnectSubscribe = async () => {
+  const doSubscribe = async () => {
+    BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
+      .then(() => {
+        addMessage('Subscribed to BLE notifications');
+        AudioModule.playAudio('chime')
+          .catch((error: any) => addMessage(`${error}`));
+        //displayNotification('Subscribed');
+      })
+      .catch((error: any) => addMessage(`BLE Subscription Error: ${error}`));
+  };
+
+  const doConnect = async () => {
     BLEModule.connectToKnownBLEDevice()
       .then((result: any) => {
         console.log('BLE Connect Result:', result);
-        // ✅ Wait for BLE connection state before subscribing
-        setTimeout(() => {
-          BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
-            .then(() => {
-              addMessage('Subscribed to BLE notifications');
-              handleConnect();
-              AudioModule.playAudio('chime');
-              displayNotification('Subscribed');
-            })
-            .catch((error: any) => addMessage(`BLE Subscription Error: ${error}`));
-        }, 1000);  // Delay to ensure connection is fully established
+        logConnection();
+        addMessage(`BLE Connect Result: ${result}`);
       })
       .catch((error: any) => addMessage(`BLE Error: ${error}`));
   };
@@ -170,11 +173,12 @@ const App = () => {
     }
     await notifee.requestPermission();
   }
+
   useEffect(() => {
     console.log('you are here');
     requestPermission();
     checkBluetooth();
-    ConnectSubscribe();
+    doConnect();
 
     console.log(DeviceEventEmitter);
 
@@ -187,13 +191,22 @@ const App = () => {
 
       }
       if (String(message.status).includes('Disconnected')) {
-        handleDisconnect();
+        logDisconnection();
         AudioModule.playAudio('bing_bong');
+        // setTimeout(() => {
+        //   addMessage('Attempting to reconnect after 2 seconds');
+        //   doConnect();
+        // }, 2000); // 2000ms = 2 seconds
       }
 
       const strMessage = String(message?.message) || '';
+      if (strMessage.includes('Characteristic found!')) {
+        addMessage('Characteristic found!');
+        doSubscribe();
+      }
       if (strMessage.includes('Not Charging')) {
         displayNotification('Battery fully charged');
+        addMessage('Battery fully charged');
       }
       if (strMessage.includes('Voltage')) {
         const matchResult = strMessage.match(/[\d.]+/);
@@ -235,8 +248,12 @@ const App = () => {
     BLEModule.disconnectBLE()
       .then((result: any) => {
         console.log(result);
+        addMessage(result);
       })
-      .catch((error: any) => console.log(error));
+      .catch((error: any) => {
+        console.log(error);
+        addMessage(error);
+      });
     setSelectedDevice(null);
   };
 
@@ -257,12 +274,12 @@ const App = () => {
           <View style={styles.buttonRow}>
             <CustomButton
               title="Connect BLE"
-              onPress={ConnectSubscribe}
+              onPress={doConnect}
               color="#FF5733"
             />
             <CustomButton
-              title="Scan Devices"
-              onPress={scanForDevices}
+              title="Subscribe BLE"
+              onPress={doSubscribe}
               color="#FF5733"
             />
           </View>
