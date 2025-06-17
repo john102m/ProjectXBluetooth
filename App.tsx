@@ -147,8 +147,7 @@ const App = () => {
     BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
       .then(() => {
         addMessage('Subscribed to BLE notifications');
-        AudioModule.playAudio('chime')
-          .catch((error: any) => addMessage(`${error}`));
+        AudioModule.playAudio('chime'); //.catch((error: any) => addMessage(`${error}`));
         //displayNotification('Subscribed');
       })
       .catch((error: any) => addMessage(`BLE Subscription Error: ${error}`));
@@ -157,7 +156,6 @@ const App = () => {
   const doConnect = async () => {
     BLEModule.connectToKnownBLEDevice()
       .then((result: any) => {
-        console.log('BLE Connect Result:', result);
         logConnection();
         addMessage(`BLE Connect Result: ${result}`);
       })
@@ -173,6 +171,15 @@ const App = () => {
     }
     await notifee.requestPermission();
   }
+  const parseBleMessage = (message: string): { voltage: string; rssi: string } => {
+    const vMatch = message.match(/V([\d.]+)/);
+    const rMatch = message.match(/R(-?\d+)/);
+
+    const voltage = vMatch ? `${vMatch[1]} V` : 'Voltage: Unknown';
+    const rssi = rMatch ? `${rMatch[1]} dBm` : 'RSSI: Unknown';
+
+    return { voltage, rssi };
+  };
 
   useEffect(() => {
     console.log('you are here');
@@ -183,13 +190,11 @@ const App = () => {
     console.log(DeviceEventEmitter);
 
     let bleSubscription = DeviceEventEmitter.addListener('BluetoothNotification', (message) => {
-      const timestamp = new Date().toLocaleTimeString();
+
+      //const timestamp = new Date().toLocaleTimeString();
       console.log('Received BLE Notification:', message);
       scrollRef.current?.scrollToEnd({ animated: true });
-      if ('message' in message) {
-        addMessage(message.message);  // Store the notification in your chat/messages
 
-      }
       if (String(message.status).includes('Disconnected')) {
         logDisconnection();
         AudioModule.playAudio('bing_bong');
@@ -203,27 +208,25 @@ const App = () => {
       if (strMessage.includes('Characteristic found!')) {
         addMessage('Characteristic found!');
         doSubscribe();
-      }
-      if (strMessage.includes('Not Charging')) {
-        displayNotification('Battery fully charged');
+      } else if (strMessage.includes('Not Charging')) {
+        //displayNotification('Battery fully charged');
         addMessage('Battery fully charged');
+      } else {
+        const { voltage, rssi } = parseBleMessage(strMessage);
+        addMessage(`Voltage: ${voltage}`); // Voltage: 2.18 V
+        addMessage(`RSSI: ${rssi}`);
       }
-      if (strMessage.includes('Voltage')) {
-        const matchResult = strMessage.match(/[\d.]+/);
-        if (matchResult) {
-          const voltageValue = parseFloat(matchResult[0]) * 2.475;
-          console.log(`[${timestamp}] Voltage: ${voltageValue.toFixed(2)}V`);
-        } else {
-          console.warn(`[${timestamp}] ⚠️ No voltage value found in message!`);
-        }
-      }
+      // if ('message' in message) {
+      //   addMessage(message.message);  // Store the raw notification message in your chat/messages
+      // }
+
     });
 
     // Listen for Bluetooth Classic messages
     const subscription = DeviceEventEmitter.addListener('BluetoothData', (message) => {
       addMessage(message);
     });
-    BluetoothModule.startListeningForData();
+    //BluetoothModule.startListeningForData();
 
     return () => {
       subscription.remove();
@@ -243,17 +246,11 @@ const App = () => {
   };
 
   const disconnectBLE = () => {
-    var message = 'disconnecting BLE.....';
-    addMessage(message);
+    addMessage('disconnecting BLE.....');
     BLEModule.disconnectBLE()
-      .then((result: any) => {
-        console.log(result);
-        addMessage(result);
-      })
-      .catch((error: any) => {
-        console.log(error);
-        addMessage(error);
-      });
+      .then((result: any) => addMessage(result))
+      .catch((error: any) => addMessage(error));
+
     setSelectedDevice(null);
   };
 
