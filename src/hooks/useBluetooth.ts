@@ -132,12 +132,14 @@ export default function useBluetooth() {
     }, [addMessage]);
 
 
-    const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string } => {
+    const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string; lightLevel: string } => {
         const vMatch = message.match(/V([\d.]+)/);
         const rMatch = message.match(/R(-?\d+)/);
+        const lMatch = message.match(/L([\d.]+)/);
         const voltage = vMatch ? `${vMatch[1]} V` : 'Voltage: Unknown';
         const rssi = rMatch ? `${rMatch[1]} dBm` : 'RSSI: Unknown';
-        return { voltage, rssi };
+        const lightLevel = lMatch ? `${lMatch[1]} %` : 'Level: Unknown';
+        return { voltage, rssi, lightLevel };
     }, []);
 
     //Separate message processing
@@ -146,8 +148,8 @@ export default function useBluetooth() {
             handleFullCharge();
             return;
         }
-        const { voltage, rssi } = parseBleMessage(message);
-        if (voltage.includes('Unknown') || rssi.includes('Unknown')) {
+        const { voltage, rssi, lightLevel } = parseBleMessage(message);
+        if (voltage.includes('Unknown') || rssi.includes('Unknown') || lightLevel.includes('Unknown')) {
             addMessage(message.trim() === '' ? 'Awaiting data...' : message);
             return;
         }
@@ -157,8 +159,14 @@ export default function useBluetooth() {
             console.error('Invalid voltage reading');
             return;
         }
+        const lLevel = parseFloat(lightLevel);
+        if (isNaN(lLevel)) {
+            console.error('Invalid light level reading');
+        }
 
         addMessage(`Voltage: ${voltage}, RSSI: ${rssi}`);
+        addMessage(`Light level: ${lLevel}%`);
+
         console.log('Counter ', counterRef.current);
 
         if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
