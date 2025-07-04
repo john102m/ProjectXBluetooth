@@ -21,7 +21,7 @@ async function displayNotification(newMessage: string) {
 
     await notifee.displayNotification({
         id: 'esp32c3_alert', // Unique ID for tracking
-        title: 'SENSOR',
+        title: 'Light sensor',
         body: newMessage,
         android: {
             channelId,
@@ -194,12 +194,12 @@ export default function useBluetooth(lightThresholdRef: React.RefObject<number>)
         if (lLevel < lightThresholdRef.current && pizzaModeRef.current) {
             setIsPizzaMode(false);
             Vibration.vibrate([100, 200, 100, 300]);
-            AudioModule.playAudio('chime');
+            AudioModule.playAudio('winningcoin');
             logEvent('PIZZA ALERT');
             if (appState.current === 'active') {
-                AudioModule.showToast('🍕 Pizza Alert!', 1); // App is in foreground
+                AudioModule.showToast('Pizza Alert!', 1); // App is in foreground
             } else {
-                displayNotification('PIZZA ALERT!'); // App is in background
+                displayNotification('Pizza Alert!'); // App is in background
             }
         }
 
