@@ -1,6 +1,9 @@
 // useBluetooth.ts (updated)
 import { useRef, useEffect, useState, useCallback } from 'react';
-import { DeviceEventEmitter, Platform, PermissionsAndroid, NativeModules, ScrollView } from 'react-native';
+import {
+    DeviceEventEmitter, Platform, AppState,
+    PermissionsAndroid, NativeModules, ScrollView, Vibration,
+} from 'react-native';
 import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 
 const { AudioModule, BLEModule } = NativeModules;
@@ -17,8 +20,8 @@ async function displayNotification(newMessage: string) {
     });
 
     await notifee.displayNotification({
-        id: 'low_battery_alert', // Unique ID for tracking
-        title: 'ESP32C3',
+        id: 'esp32c3_alert', // Unique ID for tracking
+        title: 'SENSOR',
         body: newMessage,
         android: {
             channelId,
@@ -28,7 +31,7 @@ async function displayNotification(newMessage: string) {
 
 function setupNotificationListeners(resetAlert: () => void) {
     notifee.onForegroundEvent(({ type, detail }) => {
-        if (type === EventType.DISMISSED && detail.notification?.id === 'low_battery_alert') {
+        if (type === EventType.DISMISSED && detail.notification?.id === 'esp32c3_alert') {
             console.log('User dismissed notification', detail.notification);
             resetAlert(); // Reset when dismissed
         }
@@ -36,7 +39,7 @@ function setupNotificationListeners(resetAlert: () => void) {
 
     // For background/quit state (optional)
     notifee.onBackgroundEvent(async ({ type, detail }) => {
-        if (type === EventType.DISMISSED && detail.notification?.id === 'low_battery_alert') {
+        if (type === EventType.DISMISSED && detail.notification?.id === 'esp32c3_alert') {
             console.log('User dismissed notification while app was in background');
             resetAlert(); // Reset when dismissed
         }
@@ -45,7 +48,7 @@ function setupNotificationListeners(resetAlert: () => void) {
 }
 
 
-export default function useBluetooth() {
+export default function useBluetooth(lightThresholdRef: React.RefObject<number>) {
     type BleEvent = {
         origin: 'native' | 'esp32';
         message: string;
@@ -53,6 +56,7 @@ export default function useBluetooth() {
         // other relevant fields
     };
     // State
+    const [isPizzaMode, setIsPizzaMode] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [messages, setMessages] = useState<string[]>([]);
@@ -62,10 +66,32 @@ export default function useBluetooth() {
     const hasAlerted = useRef(false);
     const scrollRef = useRef<ScrollView>(null);
     const counterRef = useRef(counter);
+    const appState = useRef(AppState.currentState);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            appState.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, []);
+
 
     useEffect(() => {
         counterRef.current = counter;
     }, [counter]);
+    const pizzaModeRef = useRef(isPizzaMode);
+
+    useEffect(() => {
+        pizzaModeRef.current = isPizzaMode;
+        if (isPizzaMode) {
+            Vibration.vibrate(100); // 🎉 Buzz when entering Pizza Mode
+            //Vibration.vibrate([100, 200, 100, 300]);
+
+        }
+    }, [isPizzaMode]);
 
     const addMessage = useCallback((newMessage: string) => {
         console.log(newMessage);
@@ -159,13 +185,27 @@ export default function useBluetooth() {
             console.error('Invalid voltage reading');
             return;
         }
+
         const lLevel = parseFloat(lightLevel);
         if (isNaN(lLevel)) {
             console.error('Invalid light level reading');
         }
 
+        if (lLevel < lightThresholdRef.current && pizzaModeRef.current) {
+            setIsPizzaMode(false);
+            Vibration.vibrate([100, 200, 100, 300]);
+            AudioModule.playAudio('chime');
+            logEvent('PIZZA ALERT');
+            if (appState.current === 'active') {
+                AudioModule.showToast('🍕 Pizza Alert!', 1); // App is in foreground
+            } else {
+                displayNotification('PIZZA ALERT!'); // App is in background
+            }
+        }
+
         addMessage(`Voltage: ${voltage}, RSSI: ${rssi}`);
         addMessage(`Light level: ${lLevel}%`);
+
 
         console.log('Counter ', counterRef.current);
 
@@ -182,7 +222,7 @@ export default function useBluetooth() {
                     .catch(e => console.error('Notification failed', e));
             }
         }
-    }, [addMessage, logEvent, handleFullCharge, parseBleMessage]);
+    }, [addMessage, logEvent, handleFullCharge, parseBleMessage, lightThresholdRef]);
 
     const doConnect = useCallback(async () => {
 
@@ -262,6 +302,8 @@ export default function useBluetooth() {
         messages,
         log,
         scrollRef,
+        isPizzaMode,
+        setIsPizzaMode,
         doConnect,
         doSubscribe,
         disconnectBLE,
