@@ -1,15 +1,34 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useRef, useEffect } from 'react';
-import { SafeAreaView, ScrollView, View, Text, Animated } from 'react-native';
-import { StatusBar, StyleSheet, Modal, TextInput } from 'react-native';
-import CustomButton from './src/CustomButton';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { SafeAreaView, View, Text, Animated } from 'react-native';
+import { StatusBar } from 'react-native';
 import useBluetooth from './src/hooks/useBluetooth';
+import ConsoleLog from './src/hooks/ConsoleLog';
+import ConnectionLog from './src/hooks/ConnectionLog';
+import StatusBanner from './src/hooks/StatusBanner';
+import ControlPanel from './src/hooks/ControlPanel'; 
+import PizzaAlertModal from './src/hooks/PizzaAlertModal';
+import ThresholdModal from './src/hooks/ThresholdModal';
+import useModals from './src/hooks/UseModals'; 
 
 const App = () => {
-  const lightThresholdRef = useRef(25);
-  // Default value
-  const [modalVisible, setModalVisible] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const lightThresholdRef = useRef(25);
+  const handlePizzaAlert = useCallback(() => {
+    showModal('pizza', {
+      onDismiss: hideModal,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const {
+    showModal,
+    hideModal,
+    isModalVisible,
+    modalType,
+    modalProps,
+  } = useModals();
+
   const {
     isConnected,
     isSubscribed,
@@ -23,8 +42,9 @@ const App = () => {
     sendBLEData,
     doSubscribe,
     addMessage,
-  } = useBluetooth(lightThresholdRef);
+  } = useBluetooth(lightThresholdRef, handlePizzaAlert);
 
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const triggerAnimation = () => {
     Animated.sequence([
@@ -40,152 +60,94 @@ const App = () => {
       }),
     ]).start();
   };
+  useEffect(() => {
+    if (isPizzaMode) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.3,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1); // reset
+    }
+  }, [isPizzaMode, pulseAnim]);
 
   useEffect(() => {
     console.log('you are here');
     doConnect();
-
     return () => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const thresholdModal = (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={modalVisible}
-      onRequestClose={() => setModalVisible(false)}
-    >
-      <View style={{
-        flex: 1,
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)',
-      }}>
-        <View style={{
-          margin: 20,
-          backgroundColor: 'white',
-          padding: 20,
-          borderRadius: 10,
-          elevation: 5,
-        }}>
-          <Text>Set Light Threshold</Text>
-          <TextInput
-            style={{ borderBottomWidth: 1, marginBottom: 10 }}
-            keyboardType="numeric"
-            value={inputValue}
-            onChangeText={setInputValue}
-            placeholder="Enter value"
-          />
-          <CustomButton
-            title="💾 Save Threshold"
-            onPress={() => {
-              const value = parseFloat(inputValue);
-              if (!isNaN(value)) {
-                lightThresholdRef.current = value;
-                addMessage(`⚡️ Updated threshold: ${value}`);
-              }
-              setModalVisible(false);
-              setInputValue('');
-            }}
-            color="#FFA500"
-          />
-        </View>
-      </View>
-    </Modal>
-  );
+  const handleThresholdOpen = useCallback(() => {
+    showModal('threshold');
+  }, [showModal]);
 
   return (
-    <> {thresholdModal} {/* This shows the modal when visible */}
+    <> {/* This shows the modal when visible */}
+      {modalType === 'threshold' && (
+        <ThresholdModal
+          visible={isModalVisible}
+          inputValue={inputValue}
+          onChangeInput={setInputValue}
+          onSave={() => {
+            const parsed = parseFloat(inputValue);
+            if (!isNaN(parsed)) {
+              lightThresholdRef.current = parsed;
+              addMessage(`⚡️ Updated threshold: ${parsed}%`);
+            }
+            setInputValue('');
+            hideModal();
+          }}
+          onClose={() => {
+            setInputValue('');
+            hideModal();
+          }}
+        />
+      )}
+
+      {modalType === 'pizza' && (
+        <PizzaAlertModal
+          visible={isModalVisible}
+          {...modalProps}
+        />
+      )}
       <SafeAreaView style={{ flex: 1 }}>
         <StatusBar translucent={true} backgroundColor="transparent" />
         <View style={{ flex: 1, paddingTop: StatusBar.currentHeight }}>
           <Text style={{ paddingLeft: 19, paddingTop: 5 }}>BLE: {isConnected ? 'Connected' : 'Disconnected'}{isSubscribed ? ', subscribed' : ''}</Text>
-          {isPizzaMode && (
-            <Text style={{ paddingLeft: 19, paddingTop: 5 }}>
-              🍕 Pizza mode; trigger level: {lightThresholdRef.current}%
-            </Text>
-          )}
-          <View style={{ margin: 20, padding: 10, backgroundColor: '#eee', height: 150 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold' }}>Console Messages:</Text>
-            <ScrollView style={{ maxHeight: 120 }} ref={scrollRef}>
-              {messages.map((msg, index) => (
-                <Text key={index}>{msg}</Text>
-              ))}
-            </ScrollView>
-          </View>
-          <View style={styles.buttonGroup}>
-            <View style={styles.buttonRow}>
-              <CustomButton
-                title="Connect BLE"
-                onPress={() => {
-                  if (!isConnected) {
-                    doConnect();
-                  } else {
-                    addMessage('Already connected');
-
-                  }
-
-                }}
-                color="#FF5733"
-              />
-              <CustomButton
-                title="Subscribe BLE"
-                onPress={() => {
-                  if (!isSubscribed) {
-                    doSubscribe();
-                  } else {
-                    addMessage('Already subscribed');
-                  }
-                }}
-                color="#FF5733"
-              />
-            </View>
-            <View style={styles.buttonRow}>
-              <CustomButton
-                title="BLE LED ON"
-                onPress={() => sendBLEData('LED_ON')}
-                color="#005733"
-              />
-              <CustomButton
-                title="BLE LED OFF"
-                onPress={() => sendBLEData('LED_OFF')}
-                color="#005733"
-              />
-            </View>
-            <View style={styles.buttonRow}>
-              <CustomButton
-                title="⚙️ Set Light Threshold"
-                onPress={() => setModalVisible(true)}
-                color="#FFA500"
-              />
-            </View>
-            <View style={styles.buttonRow}>
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <CustomButton
-                  title={isPizzaMode ? 'Exit Pizza Mode' : '🍕 Pizza Mode'}
-                  onPress={() => {
-                    setIsPizzaMode(prev => !prev);
-                    triggerAnimation();
-                  }}
-                  color="#FFD700"
-                />
-              </Animated.View>
-              <CustomButton
-                title="Disconnect BLE"
-                onPress={() => disconnectBLE()}
-                color="#005733"
-              />
-            </View>
-          </View>
-          <View style={{ flex: 1, justifyContent: 'flex-end', padding: 20, paddingBottom: 50 }}>
-            <Text style={{ fontWeight: 'bold' }}>Connection Log:</Text>
-            <ScrollView style={{ maxHeight: 100 }}>
-              {log.map((entry, index) => (
-                <Text key={index} style={{ fontSize: 12 }}>{entry}</Text>
-              ))}
-            </ScrollView>
-          </View>
+          <StatusBanner
+            visible={isPizzaMode}
+            threshold={lightThresholdRef.current}
+          />
+          <ConsoleLog messages={messages} scrollRef={scrollRef} />
+          <ControlPanel
+            isConnected={isConnected}
+            isSubscribed={isSubscribed}
+            isPizzaMode={isPizzaMode}
+            scaleAnim={scaleAnim}
+            onConnect={doConnect}
+            onSubscribe={doSubscribe}
+            onSendData={sendBLEData}
+            onSetThreshold={handleThresholdOpen}
+            onTogglePizzaMode={() => {
+              setIsPizzaMode(prev => !prev);
+              sendBLEData(isPizzaMode ? 'P_MODE_ON' : 'P_MODE_OFF');
+              triggerAnimation();
+            }}
+            onDisconnect={disconnectBLE}
+          />
+          <ConnectionLog log={log} />
         </View>
       </SafeAreaView></>
   );
@@ -193,26 +155,4 @@ const App = () => {
 
 export default App;
 
-// Add styles
-const styles = StyleSheet.create({
-  buttonContainer: {
-    flexDirection: 'row', // Arrange buttons horizontally
-    justifyContent: 'space-evenly', // Evenly distribute buttons
-    marginVertical: 10, // Add vertical spacing
-  },
-  textStyle: {
-    padding: 10,
-    fontSize: 16,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 0,
-    width: '100%',
-    backgroundColor: '#FFF',
-  },
-  buttonGroup: {
-    marginTop: 10,
-    padding: 15,
-  },
-});
+

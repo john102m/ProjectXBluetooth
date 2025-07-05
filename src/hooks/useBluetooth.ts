@@ -48,7 +48,8 @@ function setupNotificationListeners(resetAlert: () => void) {
 }
 
 
-export default function useBluetooth(lightThresholdRef: React.RefObject<number>) {
+export default function useBluetooth(
+    lightThresholdRef: React.RefObject<number>, handlePizzaAlert?: () => void) {
     type BleEvent = {
         origin: 'native' | 'esp32';
         message: string;
@@ -194,10 +195,15 @@ export default function useBluetooth(lightThresholdRef: React.RefObject<number>)
         if (lLevel < lightThresholdRef.current && pizzaModeRef.current) {
             setIsPizzaMode(false);
             Vibration.vibrate([100, 200, 100, 300]);
-            AudioModule.playAudio('winningcoin');
+            AudioModule.playAudio('major');
             logEvent('PIZZA ALERT');
             if (appState.current === 'active') {
-                AudioModule.showToast('Pizza Alert!', 1); // App is in foreground
+                if (handlePizzaAlert) {
+                    handlePizzaAlert();
+                }
+                else {
+                    AudioModule.showToast('Pizza Alert!', 1);
+                }
             } else {
                 displayNotification('Pizza Alert!'); // App is in background
             }
@@ -222,10 +228,23 @@ export default function useBluetooth(lightThresholdRef: React.RefObject<number>)
                     .catch(e => console.error('Notification failed', e));
             }
         }
-    }, [addMessage, logEvent, handleFullCharge, parseBleMessage, lightThresholdRef]);
+    }, [addMessage, logEvent, handleFullCharge, parseBleMessage, lightThresholdRef, handlePizzaAlert]);
 
     const doConnect = useCallback(async () => {
+        const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
 
+        if (!granted) {
+            const requested = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT, {
+                title: 'Bluetooth Permission',
+                message: 'This app needs Bluetooth access to connect to your oven module.',
+                buttonPositive: 'OK',
+            });
+
+            if (requested !== PermissionsAndroid.RESULTS.GRANTED) {
+                addMessage('❌ Bluetooth permission denied');
+                return;
+            }
+        }
         BLEModule.connectToKnownBLEDevice()
             .then((result: any) => {
                 logConnection();
