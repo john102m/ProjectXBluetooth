@@ -1,18 +1,21 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, Text, View, StyleSheet } from 'react-native';
 
 type Props = {
-  messages: string[];
-  scrollRef: React.RefObject<ScrollView | null>;
+  title: string;
+  entries: string[];
+  scrollRef?: React.RefObject<ScrollView | null>; // optional
 };
 
-export default function ConsoleLog({ messages, scrollRef }: Props) {
+export default function LogViewer({ title, entries, scrollRef }: Props) {
+  if (!entries || entries.length === 0) {return null;}
+
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Console Messages:</Text>
+      <Text style={styles.heading}>{title}</Text>
       <ScrollView style={styles.scroll} ref={scrollRef}>
-        {messages.map((msg, index) => (
-          <Text key={index} style={styles.message}>{msg}</Text>
+        {entries.map((entry, index) => (
+          <Text key={index} style={styles.message}>{entry}</Text>
         ))}
       </ScrollView>
     </View>

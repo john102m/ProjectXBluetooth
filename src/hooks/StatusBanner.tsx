@@ -1,12 +1,15 @@
 import React, { useRef, useEffect } from 'react';
 import { Animated, Text, View, StyleSheet } from 'react-native';
-
+import { uptimeColor } from './useLiveUptime';
 type Props = {
     visible: boolean;
     threshold: number;
+    uptime: string;
+    chargingStatus: boolean; // e.g. "Charging" or "Not Charging"
 };
 
-export default function StatusBanner({ visible, threshold }: Props) {
+
+export default function StatusBanner({ visible, threshold, uptime, chargingStatus }: Props) {
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
@@ -28,27 +31,56 @@ export default function StatusBanner({ visible, threshold }: Props) {
         } else {
             pulseAnim.setValue(1);
         }
-    }, [visible, pulseAnim]); // ← add pulseAnim here
-
-
-    if (!visible) {
-        return null;
-    }
+    }, [visible, pulseAnim]);
 
     return (
         <View style={styles.container}>
-            <Animated.View style={[styles.banner, { opacity: pulseAnim }]}>
-                <Text style={styles.text}>🍕 Pizza Mode Primed @ {threshold}%</Text>
-            </Animated.View>
+            {visible ? (
+                <Animated.View style={[styles.banner, { opacity: pulseAnim }]}>
+                    <Text style={styles.text}>🍕 Pizza Mode Primed @ {threshold}%</Text>
+                </Animated.View>
+            ) : (
+                <View style={styles.headerRow}>
+                    <Text
+                        numberOfLines={1}
+                        style={styles.titleText}
+                    >
+                        🍕 PizzaBot
+                    </Text>
+
+                    <Text
+                        numberOfLines={1}
+                        // eslint-disable-next-line react-native/no-inline-styles
+                        style={{
+                            fontSize: 16,
+                            color: uptimeColor(uptime),
+                        }}
+                    >
+                        🕒 Uptime: {uptime}
+                    </Text>
+                    <Text
+                        numberOfLines={1}
+                        // eslint-disable-next-line react-native/no-inline-styles
+                        style={{
+                            fontSize: 16,
+                            marginLeft: 8,
+                            color: chargingStatus ? 'green' : 'black',
+                        }}
+                    >
+                        🔋 {chargingStatus}
+                    </Text>
+                </View>
+            )}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
-        alignItems: 'center',
+        height: 70,
         justifyContent: 'center',
-        padding: 10,
+        backgroundColor: '#FFD700',
+        paddingHorizontal: 22,
     },
     banner: {
         backgroundColor: 'orange',
@@ -60,5 +92,17 @@ const styles = StyleSheet.create({
     text: {
         fontWeight: 'bold',
         textAlign: 'center',
+        fontSize: 16,
+    },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    titleText: {
+        fontWeight: 'bold',
+        fontSize: 18,
+        marginRight: 10,
     },
 });
+

@@ -1,17 +1,17 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { SafeAreaView, View, Text, Animated } from 'react-native';
+import { SafeAreaView, View, Animated } from 'react-native';
 import { StatusBar } from 'react-native';
 import useBluetooth from './src/hooks/useBluetooth';
-import ConsoleLog from './src/hooks/ConsoleLog';
-import ConnectionLog from './src/hooks/ConnectionLog';
+import SystemStatus from './src/hooks/SystemStatus';
 import StatusBanner from './src/hooks/StatusBanner';
-import ControlPanel from './src/hooks/ControlPanel'; 
+import ControlPanel from './src/hooks/ControlPanel';
 import PizzaAlertModal from './src/hooks/PizzaAlertModal';
 import ThresholdModal from './src/hooks/ThresholdModal';
-import useModals from './src/hooks/UseModals'; 
+import useModals from './src/hooks/UseModals';
 
 const App = () => {
+  const [uptime, setUptime] = useState<string>('—');
   const [inputValue, setInputValue] = useState('');
   const lightThresholdRef = useRef(25);
   const handlePizzaAlert = useCallback(() => {
@@ -33,16 +33,20 @@ const App = () => {
     isConnected,
     isSubscribed,
     messages,
-    log,
-    scrollRef,
+    voltage,
+    rssi,
+    lightLevel,
     isPizzaMode,
+    connectedAt,
+    chargingStatus,
     setIsPizzaMode,
     disconnectBLE,
     doConnect,
     sendBLEData,
     doSubscribe,
-    addMessage,
+    formatDuration,
   } = useBluetooth(lightThresholdRef, handlePizzaAlert);
+
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -60,6 +64,23 @@ const App = () => {
       }),
     ]).start();
   };
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+
+    if (connectedAt) {
+      timer = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - connectedAt.getTime()) / 1000);
+        setUptime(formatDuration(elapsed));
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) { clearInterval(timer); }
+      setUptime('—');
+    };
+  }, [connectedAt, formatDuration]);
+
   useEffect(() => {
     if (isPizzaMode) {
       Animated.loop(
@@ -94,7 +115,7 @@ const App = () => {
   }, [showModal]);
 
   return (
-    <> {/* This shows the modal when visible */}
+    <> {/* These show the modals when visible */}
       {modalType === 'threshold' && (
         <ThresholdModal
           visible={isModalVisible}
@@ -104,7 +125,7 @@ const App = () => {
             const parsed = parseFloat(inputValue);
             if (!isNaN(parsed)) {
               lightThresholdRef.current = parsed;
-              addMessage(`⚡️ Updated threshold: ${parsed}%`);
+              //addMessage(`⚡️ Updated threshold: ${parsed}%`);
             }
             setInputValue('');
             hideModal();
@@ -125,12 +146,14 @@ const App = () => {
       <SafeAreaView style={{ flex: 1 }}>
         <StatusBar translucent={true} backgroundColor="transparent" />
         <View style={{ flex: 1, paddingTop: StatusBar.currentHeight }}>
-          <Text style={{ paddingLeft: 19, paddingTop: 5 }}>BLE: {isConnected ? 'Connected' : 'Disconnected'}{isSubscribed ? ', subscribed' : ''}</Text>
+
           <StatusBanner
             visible={isPizzaMode}
             threshold={lightThresholdRef.current}
+            uptime={uptime}
+            chargingStatus={chargingStatus}
           />
-          <ConsoleLog messages={messages} scrollRef={scrollRef} />
+
           <ControlPanel
             isConnected={isConnected}
             isSubscribed={isSubscribed}
@@ -141,13 +164,29 @@ const App = () => {
             onSendData={sendBLEData}
             onSetThreshold={handleThresholdOpen}
             onTogglePizzaMode={() => {
-              setIsPizzaMode(prev => !prev);
-              sendBLEData(isPizzaMode ? 'P_MODE_ON' : 'P_MODE_OFF');
+              const nextMode = !isPizzaMode;
+              setIsPizzaMode(nextMode);
+              sendBLEData(nextMode ? 'P_MODE_ON' : 'P_MODE_OFF');
               triggerAnimation();
             }}
+
             onDisconnect={disconnectBLE}
           />
-          <ConnectionLog log={log} />
+          {/* Logs stack together in a section */}
+          <View style={{ marginTop: 10, paddingHorizontal: 20 }}>
+            {/*<LogViewer title="Console Log" entries={messages} scrollRef={scrollRef} />*/}
+            {/*<LogViewer title="Connection Log" entries={log} scrollRef={scrollRef} />*/}
+            <SystemStatus
+              isConnected={isConnected}
+              isSubscribed={isSubscribed}
+              threshold={lightThresholdRef.current}
+              rssi={rssi}
+              voltage={voltage}
+              lightLevel={lightLevel}
+              latestMessage={messages[messages.length - 1]}
+              connectedAt={connectedAt}
+            />
+          </View>
         </View>
       </SafeAreaView></>
   );
