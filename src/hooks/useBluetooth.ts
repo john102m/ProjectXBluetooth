@@ -7,6 +7,7 @@ import {
 import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import { formatDuration } from './useLiveUptime';
 import useBLEConnection from './useBLEConnection';
+import useBLESubscription from './useBLESubscription';
 
 const { AudioModule, BLEModule } = NativeModules;
 
@@ -59,6 +60,7 @@ export default function useBluetooth(
         // other relevant fields
     };
     // State
+    const { isSubscribed, doSubscribe, doUnsubscribe, setIsSubscribed } = useBLESubscription();
 
     const [messages, setMessages] = useState<string[]>([]);
     const addMessage = useCallback((msg: string) => {
@@ -70,7 +72,7 @@ export default function useBluetooth(
 
     const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
     const [isPizzaMode, setIsPizzaMode] = useState(false);
-    const [isSubscribed, setIsSubscribed] = useState(false);
+    //const [isSubscribed, setIsSubscribed] = useState(false);
     const [voltageLevel, setVoltageLevel] = useState<number | null>(null);
     const [rssiLevel, setRssiLevel] = useState<number | null>(null);
     const [lightLevelValue, setLightLevelValue] = useState<number | null>(null);
@@ -125,7 +127,7 @@ export default function useBluetooth(
         setIsSubscribed(false);
         setIsConnected(false);
         logDisconnection();
-    }, [logDisconnection, setIsConnected]);
+    }, [logDisconnection, setIsConnected, setIsSubscribed]);
 
     const handleDisconnection = useCallback(() => {
         setDisconnected();
@@ -142,15 +144,6 @@ export default function useBluetooth(
         }
     }, [addMessage]);
 
-    const doSubscribe = useCallback(async () => {
-        BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
-            .then(() => {
-                //addMessage('Subscribed to BLE notifications');
-                AudioModule.playAudio('chime');
-                setIsSubscribed(true);
-            })
-            .catch((error: any) => addMessage(`${error}`));
-    }, [addMessage]);
 
 
     const handleCharacteristicFound = useCallback(() => {
@@ -299,8 +292,9 @@ export default function useBluetooth(
 
         return () => {
             sub.remove();
-            setIsSubscribed(false);
-            BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
+            //setIsSubscribed(false);
+            doUnsubscribe
+            //BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleCharacteristicFound, handleDisconnection, processDeviceMessage]);
