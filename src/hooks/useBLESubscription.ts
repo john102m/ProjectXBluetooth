@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 const { BLEModule, AudioModule } = require('react-native').NativeModules;
 
 const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
@@ -20,6 +20,7 @@ export default function useBLESubscription() {
   }, []);
 
   const doUnsubscribe = useCallback(() => {
+    console.log('Unsubscribing?');
     return BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
       .then(() => {
         setIsSubscribed(false);
@@ -29,6 +30,10 @@ export default function useBLESubscription() {
         throw e;
       });
   }, []);
+
+  useEffect(() => {
+    console.log('Subscription state changed:', isSubscribed);
+}, [isSubscribed]);
 
   return { isSubscribed, doSubscribe, doUnsubscribe, setIsSubscribed };
 }
