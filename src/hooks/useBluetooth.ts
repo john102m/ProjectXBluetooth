@@ -337,6 +337,14 @@ export default function useBluetooth(
                     setIsConnected(true);
                 } else if (String(event.status).includes('Disconnected')) {
                     handleDisconnection();
+                } else if (String(event.message).includes('Charging')) {
+                    console.log('Charge message received');
+                    setTimeout(() => {
+                        const levelToSync = lightThresholdRef.current;
+                        if (levelToSync != null) {
+                            sendBLEData(`LEVEL${levelToSync}`);
+                        }
+                    }, 300); // delay is crucial
                 }
                 const strMessage = event?.message != null ? String(event.message) : '';
                 processDeviceMessage(strMessage);
@@ -348,6 +356,7 @@ export default function useBluetooth(
             setIsSubscribed(false);
             BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleCharacteristicFound, handleDisconnection, processDeviceMessage]);
 
     return {
