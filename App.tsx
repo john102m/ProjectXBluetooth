@@ -65,6 +65,7 @@ const App = () => {
     ]).start();
   };
 
+
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
 
@@ -80,6 +81,12 @@ const App = () => {
       setUptime('—');
     };
   }, [connectedAt, formatDuration]);
+
+  useEffect(() => {
+    if (!isConnected && isPizzaMode) {
+      setIsPizzaMode(false); // 🔧 auto-reset Pizza Mode
+    }
+  }, [isConnected, isPizzaMode, setIsPizzaMode]);
 
   useEffect(() => {
     if (isPizzaMode) {
@@ -126,7 +133,11 @@ const App = () => {
             if (!isNaN(parsed)) {
               lightThresholdRef.current = parsed;
               //addMessage(`⚡️ Updated threshold: ${parsed}%`);
+              if (isConnected) {
+                sendBLEData(`LEVEL${inputValue}`);
+              }
             }
+
             setInputValue('');
             hideModal();
           }}
@@ -172,10 +183,8 @@ const App = () => {
 
             onDisconnect={disconnectBLE}
           />
-          {/* Logs stack together in a section */}
+
           <View style={{ marginTop: 10, paddingHorizontal: 20 }}>
-            {/*<LogViewer title="Console Log" entries={messages} scrollRef={scrollRef} />*/}
-            {/*<LogViewer title="Connection Log" entries={log} scrollRef={scrollRef} />*/}
             <SystemStatus
               isConnected={isConnected}
               isSubscribed={isSubscribed}

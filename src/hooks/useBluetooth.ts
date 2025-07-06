@@ -58,7 +58,7 @@ export default function useBluetooth(
         // other relevant fields
     };
     // State
-    const [chargingStatus, setChargingStatus] = useState<boolean>(false);
+    const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
     const [isPizzaMode, setIsPizzaMode] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
@@ -68,12 +68,12 @@ export default function useBluetooth(
 
     const [messages, setMessages] = useState<string[]>([]);
     const [connectedAt, setConnectedAt] = useState<Date | null>(null);
-    //const [log, setLog] = useState<string[]>([]);
     const [counter, setCounter] = useState(0);
     const hasAlerted = useRef(false);
     const scrollRef = useRef<ScrollView>(null);
     const counterRef = useRef(counter);
     const appState = useRef(AppState.currentState);
+
 
     useEffect(() => {
         const subscription = AppState.addEventListener('change', nextAppState => {
@@ -84,6 +84,14 @@ export default function useBluetooth(
             subscription.remove();
         };
     }, []);
+
+    useEffect(() => {
+        if (isConnected) {
+            setChargingStatus(null); // reset until first update arrives
+        } else {
+            setChargingStatus(false);
+        }
+    }, [isConnected]);
 
 
     useEffect(() => {
@@ -105,30 +113,22 @@ export default function useBluetooth(
         setMessages(prev => [...prev.slice(-19), newMessage]);
     }, []);
 
-    const logEvent = useCallback((message: string) => {
-        const timestamp = new Date().toLocaleTimeString();
-        //setLog(prev => [...prev.slice(-19), `${timestamp} - ${message}`]);
-    }, []);
-
     const logConnection = useCallback(() => {
         setConnectedAt(new Date());
-        logEvent('Connected');
-        addMessage('Connected you are');
-    }, [logEvent, addMessage]);
+        addMessage('Connected');
+    }, [addMessage]);
 
     const logDisconnection = useCallback(() => {
         if (connectedAt) {
             const duration = (Date.now() - connectedAt.getTime()) / 1000;
             const formattedDuration = formatDuration(duration);
-            //logEvent(`Connected for ${formattedDuration}`);
             addMessage(`Connected for ${formattedDuration}`);
 
             setConnectedAt(null);
         } else {
-            logEvent('Unable to connect');
             addMessage('Unable to connect');
         }
-    }, [connectedAt, logEvent, addMessage]);
+    }, [connectedAt, addMessage]);
 
 
     const resetAlert = useCallback(() => {
@@ -148,6 +148,16 @@ export default function useBluetooth(
         AudioModule.playAudio('bing_bong');
     }, [setDisconnected]);
 
+    const sendBLEData = useCallback(async (message: string) => {
+        try {
+            await BLEModule.writeToBLECharacteristic(SERVICE_UUID, CHARACTERISTIC_UUID, message);
+            console.log(`Sent via BLE: ${message}`);
+            //addMessage(`Sent: ${message}`);//no because ESP32C3 will echo commands as notifs
+        } catch (error) {
+            addMessage(`${error}`);
+        }
+    }, [addMessage]);
+
     const doSubscribe = useCallback(async () => {
         BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
             .then(() => {
@@ -160,9 +170,8 @@ export default function useBluetooth(
 
 
     const handleCharacteristicFound = useCallback(() => {
-        addMessage('Characteristic found!');
         doSubscribe();
-    }, [addMessage, doSubscribe]);
+    }, [doSubscribe]);
 
     const handleChargeStatus = useCallback((message: string) => {
         if (message.includes('Not')) {
@@ -174,23 +183,54 @@ export default function useBluetooth(
     }, [addMessage]);
 
 
-    const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string; lightLevel: string } => {
+    const sendAlert = useCallback(() => {
+        setIsPizzaMode(false);
+        sendBLEData('P_MODE_OFF');
+        Vibration.vibrate([100, 200, 100, 300]);
+        AudioModule.playAudio('major');
+
+        if (appState.current === 'active') {
+            if (handlePizzaAlert) {
+                handlePizzaAlert();
+            } else {
+                AudioModule.showToast('Pizza Alert!', 1);
+            }
+        } else {
+            displayNotification('Pizza Alert!');
+        }
+    }, [handlePizzaAlert, appState, sendBLEData]); // Include any reactive values used
+
+
+    const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string; lightLevel: string, batteryStatus: boolean | null } => {
         const vMatch = message.match(/V([\d.]+)/);
         const rMatch = message.match(/R(-?\d+)/);
         const lMatch = message.match(/L([\d.]+)/);
+        const bMatch = message.match(/B(\d)/);
         const voltage = vMatch ? `${vMatch[1]} V` : 'Voltage: Unknown';
         const rssi = rMatch ? `${rMatch[1]} dBm` : 'RSSI: Unknown';
         const lightLevel = lMatch ? `${lMatch[1]} %` : 'Level: Unknown';
-        return { voltage, rssi, lightLevel };
+
+        const batteryStatus =
+            bMatch && (bMatch[1] === '1' || bMatch[1] === '0')
+                ? bMatch[1] === '0'
+                : null;
+        return { voltage, rssi, lightLevel, batteryStatus };
     }, []);
 
     //Separate message processing
     const processDeviceMessage = useCallback((message: string) => {
+
+        if (message.includes('LDR!')) {  //the main event really
+            sendAlert();
+            return;
+        }
         if (message.includes('Charging')) {
             handleChargeStatus(message);
             return;
         }
-        const { voltage, rssi, lightLevel } = parseBleMessage(message);
+        const { voltage, rssi, lightLevel, batteryStatus } = parseBleMessage(message);
+        console.log('Battery Status: ', batteryStatus);
+        setChargingStatus(batteryStatus);
         const rssiNum = parseFloat(rssi);
         if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
 
@@ -214,33 +254,13 @@ export default function useBluetooth(
         } else {
             setLightLevelValue(lLevel);
         }
+        // if (lLevel < lightThresholdRef.current && pizzaModeRef.current) {
+        //     sendAlert();
 
-
-        if (lLevel < lightThresholdRef.current && pizzaModeRef.current) {
-            setIsPizzaMode(false);
-            Vibration.vibrate([100, 200, 100, 300]);
-            AudioModule.playAudio('major');
-            logEvent('PIZZA ALERT');
-            if (appState.current === 'active') {
-                if (handlePizzaAlert) {
-                    handlePizzaAlert();
-                }
-                else {
-                    AudioModule.showToast('Pizza Alert!', 1);
-                }
-            } else {
-                displayNotification('Pizza Alert!'); // App is in background
-            }
-        }
-
-        //addMessage(`Voltage: ${voltage}, RSSI: ${rssi}`);
-        //addMessage(`Light level: ${lLevel}%`);
-
-
+        // }
         console.log('Counter ', counterRef.current);
-
         if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
-            logEvent('Low voltage detected!');
+            addMessage('Low voltage detected!');
             if (counterRef.current < 2) {
                 setCounter(prev => prev + 1);
             } else {
@@ -252,7 +272,7 @@ export default function useBluetooth(
                     .catch(e => console.error('Notification failed', e));
             }
         }
-    }, [addMessage, logEvent, handleChargeStatus, parseBleMessage, lightThresholdRef, handlePizzaAlert]);
+    }, [addMessage, handleChargeStatus, parseBleMessage, sendAlert]);
 
     const doConnect = useCallback(async () => {
         const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
@@ -292,16 +312,6 @@ export default function useBluetooth(
             .catch((error: any) => addMessage(error));
     }, [isConnected, addMessage, setDisconnected]);
 
-    const sendBLEData = useCallback(async (message: string) => {
-        try {
-            await BLEModule.writeToBLECharacteristic(SERVICE_UUID, CHARACTERISTIC_UUID, message);
-            console.log(`Sent via BLE: ${message}`);
-            //addMessage(`Sent: ${message}`);//no because ESP32C3 will echo commands as notifs
-        } catch (error) {
-            addMessage(`${error}`);
-        }
-    }, [addMessage]);
-
 
     // Notification permission on mount
     useEffect(() => {
@@ -314,6 +324,7 @@ export default function useBluetooth(
         setupNotifications();
         setupNotificationListeners(resetAlert);
     }, [resetAlert]);
+
 
     // BLE Event listener
     useEffect(() => {
@@ -358,3 +369,4 @@ export default function useBluetooth(
         connectedAt,
     };
 }
+

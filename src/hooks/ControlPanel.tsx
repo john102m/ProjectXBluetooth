@@ -16,6 +16,7 @@ type Props = {
 };
 
 export default function ControlPanel({
+  isConnected,
   isPizzaMode,
   scaleAnim,
   onConnect,
@@ -37,6 +38,7 @@ export default function ControlPanel({
           title="Subscribe BLE"
           onPress={onSubscribe}
           color="#FF5733"
+          disabled={!isConnected}
         />
       </View>
 
@@ -45,11 +47,13 @@ export default function ControlPanel({
           title="BLE LED ON"
           onPress={() => onSendData('LED_ON')}
           color="#005733"
+          disabled={!isConnected}
         />
         <CustomButton
           title="BLE LED OFF"
           onPress={() => onSendData('LED_OFF')}
           color="#005733"
+          disabled={!isConnected}
         />
       </View>
 
@@ -67,12 +71,19 @@ export default function ControlPanel({
             title={isPizzaMode ? 'Exit Pizza Mode' : '🍕 Pizza Mode'}
             onPress={onTogglePizzaMode}
             color="#FFD700"
+            disabled={!isConnected}
+            // eslint-disable-next-line react-native/no-inline-styles
+            style={{ width: '160' }}
+
           />
         </Animated.View>
         <CustomButton
-          title="Disconnect BLE"
+          title="Disconnect"
           onPress={onDisconnect}
           color="#005733"
+          disabled={!isConnected}
+          // eslint-disable-next-line react-native/no-inline-styles
+          style={{ width: '160' }}
         />
       </View>
     </View>

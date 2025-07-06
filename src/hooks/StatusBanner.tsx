@@ -5,13 +5,18 @@ type Props = {
     visible: boolean;
     threshold: number;
     uptime: string;
-    chargingStatus: boolean; // e.g. "Charging" or "Not Charging"
+    chargingStatus: boolean | null; // e.g. "Charging" or "Not Charging"
 };
 
 
 export default function StatusBanner({ visible, threshold, uptime, chargingStatus }: Props) {
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const flashAnim = useRef(new Animated.Value(1)).current;
 
+    const emojiWrapperStyle = {
+        ...styles.emojiWrapper,
+        backgroundColor: chargingStatus ? 'green' : '#FFD700',
+    };
     useEffect(() => {
         if (visible) {
             Animated.loop(
@@ -32,6 +37,27 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
             pulseAnim.setValue(1);
         }
     }, [visible, pulseAnim]);
+    useEffect(() => {
+        if (chargingStatus) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(flashAnim, {
+                        toValue: 0.3,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(flashAnim, {
+                        toValue: 1,
+                        duration: 300,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start();
+        } else {
+            flashAnim.setValue(0); // reset
+        }
+    }, [chargingStatus, flashAnim]);
+
 
     return (
         <View style={styles.container}>
@@ -58,29 +84,45 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
                     >
                         🕒 Uptime: {uptime}
                     </Text>
-                    <Text
-                        numberOfLines={1}
-                        // eslint-disable-next-line react-native/no-inline-styles
-                        style={{
-                            fontSize: 16,
-                            marginLeft: 8,
-                            color: chargingStatus ? 'green' : 'black',
-                        }}
-                    >
-                        🔋 {chargingStatus}
-                    </Text>
+
+                    <View style={emojiWrapperStyle}>
+                        <Animated.Text style={[styles.emojiText, { opacity: flashAnim }]}>
+                            ⚡
+                        </Animated.Text>
+                    </View>
+
                 </View>
             )}
         </View>
     );
 }
 
+
 const styles = StyleSheet.create({
+    emojiWrapper: {
+        width: 28,
+        height: 28,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
+    emojiText: {
+        color: 'white',
+        fontSize: 16,
+        textShadowColor: 'white',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 1,
+        marginTop: -4,
+    },
     container: {
         height: 70,
+        alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#FFD700',
         paddingHorizontal: 22,
+        width: '100%',
+        paddingVertical: 10,
     },
     banner: {
         backgroundColor: 'orange',
@@ -105,4 +147,5 @@ const styles = StyleSheet.create({
         marginRight: 10,
     },
 });
+
 

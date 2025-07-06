@@ -1,9 +1,28 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 
-const CustomButton = ({ onPress, title, color }: { onPress: () => void; title: string; color: string }) => (
-    <TouchableOpacity onPress={onPress} style={[styles.button, { backgroundColor: color }]}>
-        <Text style={styles.buttonText}>{title}</Text>
+type ButtonProps = {
+    onPress: () => void;
+    title: string;
+    color: string;
+    disabled?: boolean; // ✅ optional prop
+    style?: any
+};
+
+const CustomButton = ({ onPress, title, color, disabled = false, style = { minWidth: 150 } }: ButtonProps) => (
+    <TouchableOpacity
+        onPress={onPress}
+        style={[styles.button, { backgroundColor: color }, style, disabled && styles.disabled]}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled} // ⛔ disables press interaction
+    >
+        <Text style={[styles.buttonText, disabled && styles.disabledText]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            adjustsFontSizeToFit
+        >
+            {title}
+        </Text>
     </TouchableOpacity>
 );
 
@@ -16,12 +35,18 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,
-        elevation: 8, // Adds depth to buttons on Android
+        elevation: 8,
     },
     buttonText: {
         color: '#FFF',
         fontWeight: 'bold',
         textAlign: 'center',
+    },
+    disabled: {
+        opacity: 0.5, // 🔒 visually indicate inactive
+    },
+    disabledText: {
+        color: '#DDD',
     },
 });
 
