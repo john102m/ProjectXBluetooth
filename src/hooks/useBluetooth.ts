@@ -59,6 +59,12 @@ export default function useBluetooth(
         status?: string;
         // other relevant fields
     };
+    const BLE_STATUS = {
+        CHAR_FOUND: 'Characteristic found!',
+        DISCONNECTED: 'Disconnected',
+        CHARGING: 'Charging',
+    } as const;
+
     // State
     const { isSubscribed, doSubscribe, doUnsubscribe, setIsSubscribed } = useBLESubscription();
 
@@ -201,7 +207,7 @@ export default function useBluetooth(
             sendAlert();
             return;
         }
-        if (message.includes('Charging')) {
+        if (message.includes(BLE_STATUS.CHARGING)) {
             handleChargeStatus(message);
             return;
         }
@@ -249,7 +255,7 @@ export default function useBluetooth(
                     .catch(e => console.error('Notification failed', e));
             }
         }
-    }, [addMessage, handleChargeStatus, parseBleMessage, sendAlert]);
+    }, [BLE_STATUS.CHARGING, addMessage, handleChargeStatus, parseBleMessage, sendAlert]);
 
 
     // Notification permission on mount
@@ -271,10 +277,10 @@ export default function useBluetooth(
             'BluetoothNotification',
             (event: BleEvent) => {
                 scrollRef.current?.scrollToEnd({ animated: true });
-                if (String(event.status).includes('Characteristic found!')) {
+                if (String(event.status).includes(BLE_STATUS.CHAR_FOUND)) {
                     handleCharacteristicFound();
                     setIsConnected(true);
-                } else if (String(event.status).includes('Disconnected')) {
+                } else if (String(event.status).includes(BLE_STATUS.DISCONNECTED)) {
                     handleDisconnection();
                 } else if (String(event.message).includes('Charging')) {
                     console.log('Charge message received');
@@ -291,10 +297,9 @@ export default function useBluetooth(
         );
 
         return () => {
+
             sub.remove();
-            //setIsSubscribed(false);
-            doUnsubscribe
-            //BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
+            doUnsubscribe().catch(console.error);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleCharacteristicFound, handleDisconnection, processDeviceMessage]);
