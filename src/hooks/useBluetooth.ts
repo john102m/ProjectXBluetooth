@@ -22,7 +22,7 @@ async function displayNotification(newMessage: string) {
 
     await notifee.displayNotification({
         id: 'esp32c3_alert', // Unique ID for tracking
-        title: 'Light sensor',
+        title: 'PizzaBot',
         body: newMessage,
         android: {
             channelId,

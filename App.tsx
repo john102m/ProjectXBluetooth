@@ -13,7 +13,7 @@ import useModals from './src/hooks/UseModals';
 const App = () => {
   const [uptime, setUptime] = useState<string>('—');
   const [inputValue, setInputValue] = useState('');
-  const lightThresholdRef = useRef(25);
+  const lightThresholdRef = useRef(10);
   const handlePizzaAlert = useCallback(() => {
     showModal('pizza', {
       onDismiss: hideModal,
