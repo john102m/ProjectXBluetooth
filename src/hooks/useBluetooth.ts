@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import { formatDuration } from './useLiveUptime';
+import useBLEConnection from './useBLEConnection';
 
 const { AudioModule, BLEModule } = NativeModules;
 
@@ -58,16 +59,21 @@ export default function useBluetooth(
         // other relevant fields
     };
     // State
+
+    const [messages, setMessages] = useState<string[]>([]);
+    const addMessage = useCallback((msg: string) => {
+        console.log(msg);
+        setMessages((prev) => [...prev.slice(-19), msg]);
+    }, []);
+
+    const { isConnected, connectedAt, doConnect, setIsConnected, logDisconnection, disconnectBLE } = useBLEConnection(addMessage);
+
     const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
     const [isPizzaMode, setIsPizzaMode] = useState(false);
-    const [isConnected, setIsConnected] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [voltageLevel, setVoltageLevel] = useState<number | null>(null);
     const [rssiLevel, setRssiLevel] = useState<number | null>(null);
     const [lightLevelValue, setLightLevelValue] = useState<number | null>(null);
-
-    const [messages, setMessages] = useState<string[]>([]);
-    const [connectedAt, setConnectedAt] = useState<Date | null>(null);
     const [counter, setCounter] = useState(0);
     const hasAlerted = useRef(false);
     const scrollRef = useRef<ScrollView>(null);
@@ -108,28 +114,6 @@ export default function useBluetooth(
         }
     }, [isPizzaMode]);
 
-    const addMessage = useCallback((newMessage: string) => {
-        console.log(newMessage);
-        setMessages(prev => [...prev.slice(-19), newMessage]);
-    }, []);
-
-    const logConnection = useCallback(() => {
-        setConnectedAt(new Date());
-        addMessage('Connected');
-    }, [addMessage]);
-
-    const logDisconnection = useCallback(() => {
-        if (connectedAt) {
-            const duration = (Date.now() - connectedAt.getTime()) / 1000;
-            const formattedDuration = formatDuration(duration);
-            addMessage(`Connected for ${formattedDuration}`);
-
-            setConnectedAt(null);
-        } else {
-            addMessage('Unable to connect');
-        }
-    }, [connectedAt, addMessage]);
-
 
     const resetAlert = useCallback(() => {
         hasAlerted.current = false;
@@ -141,7 +125,7 @@ export default function useBluetooth(
         setIsSubscribed(false);
         setIsConnected(false);
         logDisconnection();
-    }, [logDisconnection]);
+    }, [logDisconnection, setIsConnected]);
 
     const handleDisconnection = useCallback(() => {
         setDisconnected();
@@ -273,44 +257,6 @@ export default function useBluetooth(
             }
         }
     }, [addMessage, handleChargeStatus, parseBleMessage, sendAlert]);
-
-    const doConnect = useCallback(async () => {
-        const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
-
-        if (!granted) {
-            const requested = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT, {
-                title: 'Bluetooth Permission',
-                message: 'This app needs Bluetooth access to connect to your oven module.',
-                buttonPositive: 'OK',
-            });
-
-            if (requested !== PermissionsAndroid.RESULTS.GRANTED) {
-                addMessage('❌ Bluetooth permission denied');
-                return;
-            }
-        }
-        BLEModule.connectToKnownBLEDevice()
-            .then((result: any) => {
-                logConnection();
-                setIsConnected(true);
-                addMessage(`BLE Connect Result: ${result}`);
-            })
-            .catch((error: any) => addMessage(`${error}`));
-    }, [addMessage, logConnection]);
-
-    const disconnectBLE = useCallback(() => {
-        if (!isConnected) {
-            addMessage('Not connected');
-            return;
-        }
-        addMessage('disconnecting BLE.....');
-        BLEModule.disconnectBLE()
-            .then((result: any) => {
-                addMessage(result);
-                setDisconnected();
-            })
-            .catch((error: any) => addMessage(error));
-    }, [isConnected, addMessage, setDisconnected]);
 
 
     // Notification permission on mount
