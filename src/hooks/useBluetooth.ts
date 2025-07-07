@@ -1,35 +1,14 @@
 // useBluetooth.ts (updated)
 import { useRef, useEffect, useState, useCallback } from 'react';
 import {
-    DeviceEventEmitter, Platform, AppState,
-    PermissionsAndroid, NativeModules, ScrollView, Vibration,
+    DeviceEventEmitter, Platform, PermissionsAndroid,
+    NativeModules, ScrollView, Vibration, AppState
 } from 'react-native';
 import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import { formatDuration } from './useLiveUptime';
-import useBLEConnection from './useBLEConnection';
-
-const { AudioModule, BLEModule } = NativeModules;
-
-const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-const VOLTAGE_WARNING_THRESHOLD = 1.4;
-
-async function displayNotification(newMessage: string) {
-    const channelId = await notifee.createChannel({
-        id: 'default',
-        name: 'Default Channel',
-        importance: AndroidImportance.HIGH,
-    });
-
-    await notifee.displayNotification({
-        id: 'esp32c3_alert', // Unique ID for tracking
-        title: 'PizzaBot',
-        body: newMessage,
-        android: {
-            channelId,
-        },
-    });
-}
+import useBLEManager from './useBLEManager';
+import useBLENotifications from './useBLENotifications';
+const { AudioModule } = NativeModules;
 
 function setupNotificationListeners(resetAlert: () => void) {
     notifee.onForegroundEvent(({ type, detail }) => {
@@ -49,6 +28,27 @@ function setupNotificationListeners(resetAlert: () => void) {
     });
 }
 
+async function displayNotification(newMessage: string) {
+    const channelId = await notifee.createChannel({
+        id: 'default',
+        name: 'Default Channel',
+        importance: AndroidImportance.HIGH,
+    });
+
+    await notifee.displayNotification({
+        id: 'esp32c3_alert', // Unique ID for tracking
+        title: 'PizzaBot',
+        body: newMessage,
+        android: {
+            channelId,
+        },
+    });
+}
+
+function playWarningSound() {
+    AudioModule.playAudio('bing_bong');
+    Vibration.vibrate([100, 200, 100, 300]);
+}
 
 export default function useBluetooth(
     lightThresholdRef: React.RefObject<number>, handlePizzaAlert?: () => void) {
@@ -59,113 +59,27 @@ export default function useBluetooth(
         // other relevant fields
     };
     // State
-
+    const appState = useRef(AppState.currentState);
     const [messages, setMessages] = useState<string[]>([]);
     const addMessage = useCallback((msg: string) => {
         console.log(msg);
         setMessages((prev) => [...prev.slice(-19), msg]);
     }, []);
 
-    const { isConnected, connectedAt, doConnect, setIsConnected, logDisconnection, disconnectBLE } = useBLEConnection(addMessage);
-
-    const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
     const [isPizzaMode, setIsPizzaMode] = useState(false);
-    const [isSubscribed, setIsSubscribed] = useState(false);
-    const [voltageLevel, setVoltageLevel] = useState<number | null>(null);
-    const [rssiLevel, setRssiLevel] = useState<number | null>(null);
-    const [lightLevelValue, setLightLevelValue] = useState<number | null>(null);
-    const [counter, setCounter] = useState(0);
-    const hasAlerted = useRef(false);
     const scrollRef = useRef<ScrollView>(null);
-    const counterRef = useRef(counter);
-    const appState = useRef(AppState.currentState);
-
-
-    useEffect(() => {
-        const subscription = AppState.addEventListener('change', nextAppState => {
-            appState.current = nextAppState;
-        });
-
-        return () => {
-            subscription.remove();
-        };
-    }, []);
-
-    useEffect(() => {
-        if (isConnected) {
-            setChargingStatus(null); // reset until first update arrives
-        } else {
-            setChargingStatus(false);
-        }
-    }, [isConnected]);
-
-
-    useEffect(() => {
-        counterRef.current = counter;
-    }, [counter]);
-    const pizzaModeRef = useRef(isPizzaMode);
-
-    useEffect(() => {
-        pizzaModeRef.current = isPizzaMode;
-        if (isPizzaMode) {
-            Vibration.vibrate(100); // 🎉 Buzz when entering Pizza Mode
-            //Vibration.vibrate([100, 200, 100, 300]);
-
-        }
-    }, [isPizzaMode]);
-
-
-    const resetAlert = useCallback(() => {
-        hasAlerted.current = false;
-        setCounter(0);
-        console.log('Alert state reset');
-    }, []);
-
-    const setDisconnected = useCallback(() => {
-        setIsSubscribed(false);
-        setIsConnected(false);
-        logDisconnection();
-    }, [logDisconnection, setIsConnected]);
-
-    const handleDisconnection = useCallback(() => {
-        setDisconnected();
-        AudioModule.playAudio('bing_bong');
-    }, [setDisconnected]);
-
-    const sendBLEData = useCallback(async (message: string) => {
-        try {
-            await BLEModule.writeToBLECharacteristic(SERVICE_UUID, CHARACTERISTIC_UUID, message);
-            console.log(`Sent via BLE: ${message}`);
-            //addMessage(`Sent: ${message}`);//no because ESP32C3 will echo commands as notifs
-        } catch (error) {
-            addMessage(`${error}`);
-        }
-    }, [addMessage]);
-
-    const doSubscribe = useCallback(async () => {
-        BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
-            .then(() => {
-                //addMessage('Subscribed to BLE notifications');
-                AudioModule.playAudio('chime');
-                setIsSubscribed(true);
-            })
-            .catch((error: any) => addMessage(`${error}`));
-    }, [addMessage]);
-
-
-    const handleCharacteristicFound = useCallback(() => {
-        doSubscribe();
-    }, [doSubscribe]);
-
-    const handleChargeStatus = useCallback((message: string) => {
-        if (message.includes('Not')) {
-            setChargingStatus(false);
-        } else {
-            setChargingStatus(true);
-        }
-        addMessage(message);
-    }, [addMessage]);
-
+    const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
+    const { isConnected,
+        connectedAt,
+        doConnect,
+        setIsConnected,
+        logDisconnection,
+        disconnectBLE,
+        sendBLEData,
+        isSubscribed,
+        doSubscribe,
+        setIsSubscribed,
+    } = useBLEManager(addMessage);
 
     const sendAlert = useCallback(() => {
         setIsPizzaMode(false);
@@ -182,84 +96,31 @@ export default function useBluetooth(
         } else {
             displayNotification('Pizza Alert!');
         }
-    }, [handlePizzaAlert, appState, sendBLEData]); // Include any reactive values used
+    }, [setIsPizzaMode, sendBLEData, handlePizzaAlert]); // Include any reactive values used 
 
+    const {
+        processDeviceMessage,
+        resetAlert,
+        voltageLevel,
+        rssiLevel,
+        lightLevelValue,
+    } = useBLENotifications(
+        sendAlert,
+        setChargingStatus,
+        displayNotification,
+        playWarningSound,
+        addMessage);
 
-    const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string; lightLevel: string, batteryStatus: boolean | null } => {
-        const vMatch = message.match(/V([\d.]+)/);
-        const rMatch = message.match(/R(-?\d+)/);
-        const lMatch = message.match(/L([\d.]+)/);
-        const bMatch = message.match(/B(\d)/);
-        const voltage = vMatch ? `${vMatch[1]} V` : 'Voltage: Unknown';
-        const rssi = rMatch ? `${rMatch[1]} dBm` : 'RSSI: Unknown';
-        const lightLevel = lMatch ? `${lMatch[1]} %` : 'Level: Unknown';
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            appState.current = nextAppState;
+        });
 
-        const batteryStatus =
-            bMatch && (bMatch[1] === '1' || bMatch[1] === '0')
-                ? bMatch[1] === '0'
-                : null;
-        return { voltage, rssi, lightLevel, batteryStatus };
+        return () => {
+            subscription.remove();
+        };
     }, []);
 
-    //Separate message processing
-    const processDeviceMessage = useCallback((message: string) => {
-
-        if (message.includes('LDR!')) {  //the main event really
-            sendAlert();
-            return;
-        }
-        if (message.includes('Charging')) {
-            handleChargeStatus(message);
-            return;
-        }
-        const { voltage, rssi, lightLevel, batteryStatus } = parseBleMessage(message);
-        console.log('Battery Status: ', batteryStatus);
-        setChargingStatus(batteryStatus);
-        const rssiNum = parseFloat(rssi);
-        if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
-
-        //this happens if the notification did not contain and sensor data - e.g a general message
-        if (voltage.includes('Unknown') || rssi.includes('Unknown') || lightLevel.includes('Unknown')) {
-            if (message.trim() !== '') {
-                addMessage(message.trim());
-            }
-            return;
-        }
-        const volts = parseFloat(voltage);
-        if (isNaN(volts)) {
-            console.error('Invalid voltage reading');
-            return;
-        }
-        setVoltageLevel(volts);
-
-        const lLevel = parseFloat(lightLevel);
-        if (isNaN(lLevel)) {
-            console.error('Invalid light level reading');
-        } else {
-            setLightLevelValue(lLevel);
-        }
-        // if (lLevel < lightThresholdRef.current && pizzaModeRef.current) {
-        //     sendAlert();
-
-        // }
-        console.log('Counter ', counterRef.current);
-        if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
-            addMessage('Low voltage detected!');
-            if (counterRef.current < 2) {
-                setCounter(prev => prev + 1);
-            } else {
-                setCounter(0);
-                hasAlerted.current = true;
-                AudioModule.playAudio('bing_bong');
-                displayNotification('Low Battery!')
-                    .then(() => console.log('Notification shown'))
-                    .catch(e => console.error('Notification failed', e));
-            }
-        }
-    }, [addMessage, handleChargeStatus, parseBleMessage, sendAlert]);
-
-
-    // Notification permission on mount
     useEffect(() => {
         const setupNotifications = async () => {
             if (Platform.OS === 'android') {
@@ -270,6 +131,29 @@ export default function useBluetooth(
         setupNotifications();
         setupNotificationListeners(resetAlert);
     }, [resetAlert]);
+
+    useEffect(() => {
+        if (isConnected) {
+            setChargingStatus(null); // reset until first update arrives
+        } else {
+            setChargingStatus(false);
+        }
+    }, [isConnected]);
+
+    const setDisconnected = useCallback(() => {
+        setIsSubscribed(false);
+        setIsConnected(false);
+        logDisconnection();
+    }, [logDisconnection, setIsConnected, setIsSubscribed]);
+
+    const handleDisconnection = useCallback(() => {
+        setDisconnected();
+        AudioModule.playAudio('bing_bong');
+    }, [setDisconnected]);
+
+    const handleCharacteristicFound = useCallback(() => {
+        doSubscribe();
+    }, [doSubscribe]);
 
 
     // BLE Event listener
@@ -300,7 +184,7 @@ export default function useBluetooth(
         return () => {
             sub.remove();
             setIsSubscribed(false);
-            BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
+            //BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleCharacteristicFound, handleDisconnection, processDeviceMessage]);

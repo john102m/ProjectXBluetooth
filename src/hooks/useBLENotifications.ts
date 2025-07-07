@@ -1,42 +1,115 @@
 // useBLENotifications.ts
-import { useState, useEffect, useCallback } from 'react';
-import { DeviceEventEmitter } from 'react-native';
+import { useRef, useState, useCallback } from 'react';
+const VOLTAGE_WARNING_THRESHOLD = 1.4;
 
-const { BLEModule } = require('react-native').NativeModules;
+export default function useBLENotifications(
+  sendAlert: () => void,
+  setChargingStatus: (status: boolean | null) => void,
+  displayNotification: (msg: string) => void,
+  playWarningSound: () => void,
+  addMessage: (msg: string) => void) {
 
-const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
-const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+  const [counter, setCounter] = useState(0);
+  const counterRef = useRef(counter);
+  const hasAlerted = useRef(false);
+  const [voltageLevel, setVoltageLevel] = useState<number | null>(null);
+  const [rssiLevel, setRssiLevel] = useState<number | null>(null);
+  const [lightLevelValue, setLightLevelValue] = useState<number | null>(null);
 
-export default function useBLENotifications(onMessageReceived: (msg: string) => void) {
-  const [isSubscribed, setIsSubscribed] = useState(false);
-
-  const doSubscribe = useCallback(() => {
-    BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
-      .then(() => {
-        setIsSubscribed(true);
-      })
-      .catch((error: any) => {
-        console.error('Subscribe error:', error);
-      });
+  const resetAlert = useCallback(() => {
+    hasAlerted.current = false;
+    setCounter(0);
+    console.log('Alert state reset');
   }, []);
 
-  useEffect(() => {
-    const subscription = DeviceEventEmitter.addListener(
-      'BluetoothNotification',
-      (event: any) => {
-        if (event?.message) {
-          onMessageReceived(event.message);
-        }
+
+  const handleChargeStatus = useCallback((message: string) => {
+    if (message.includes('Not')) {
+      setChargingStatus(false);
+    } else {
+      setChargingStatus(true);
+    }
+    addMessage(message);
+  }, [addMessage, setChargingStatus]);
+
+  const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string; lightLevel: string, batteryStatus: boolean | null } => {
+    const vMatch = message.match(/V([\d.]+)/);
+    const rMatch = message.match(/R(-?\d+)/);
+    const lMatch = message.match(/L([\d.]+)/);
+    const bMatch = message.match(/B(\d)/);
+    const voltage = vMatch ? `${vMatch[1]} V` : 'Voltage: Unknown';
+    const rssi = rMatch ? `${rMatch[1]} dBm` : 'RSSI: Unknown';
+    const lightLevel = lMatch ? `${lMatch[1]} %` : 'Level: Unknown';
+
+    const batteryStatus =
+      bMatch && (bMatch[1] === '1' || bMatch[1] === '0')
+        ? bMatch[1] === '0'
+        : null;
+    return { voltage, rssi, lightLevel, batteryStatus };
+  }, []);
+
+
+  //Separate message processing
+  const processDeviceMessage = useCallback((message: string) => {
+
+    if (message.includes('LDR!')) {  //the main event really
+      sendAlert();
+      return;
+    }
+    if (message.includes('Charging')) {
+      handleChargeStatus(message);
+      return;
+    }
+    const { voltage, rssi, lightLevel, batteryStatus } = parseBleMessage(message);
+    console.log('Battery Status: ', batteryStatus);
+    setChargingStatus(batteryStatus);
+    const rssiNum = parseFloat(rssi);
+    if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
+
+    //this happens if the notification did not contain and sensor data - e.g a general message
+    if (voltage.includes('Unknown') || rssi.includes('Unknown') || lightLevel.includes('Unknown')) {
+      if (message.trim() !== '') {
+        addMessage(message.trim());
       }
-    );
+      return;
+    }
 
-    return () => {
-      subscription.remove();
-      BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID)
-        .catch((error: any) => console.error('Unsubscribe error:', error));
-      setIsSubscribed(false);
-    };
-  }, [onMessageReceived]);
+    const volts = parseFloat(voltage);
+    if (isNaN(volts)) { return; }
+    setVoltageLevel(volts);
 
-  return { isSubscribed, doSubscribe, setIsSubscribed };
+    const lLevel = parseFloat(lightLevel);
+    if (isNaN(lLevel)) {
+      console.log('Invalid light level reading');
+    } else {
+      setLightLevelValue(lLevel);
+    }
+
+    if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
+      addMessage('Low voltage detected!');
+      if (counterRef.current < 2) {
+        setCounter(prev => prev + 1);
+      } else {
+        setCounter(0);
+        hasAlerted.current = true;
+        playWarningSound();
+        displayNotification('Low Battery!');//catch(console.error);
+      }
+    }
+  }, [addMessage,
+    displayNotification,
+    handleChargeStatus,
+    parseBleMessage,
+    playWarningSound,
+    sendAlert,
+    setChargingStatus]);
+
+  return {
+    voltageLevel,
+    rssiLevel,
+    lightLevelValue,
+    processDeviceMessage,
+    resetAlert,
+    hasAlerted,
+  };
 }
