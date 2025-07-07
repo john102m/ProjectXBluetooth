@@ -2,10 +2,9 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import {
     DeviceEventEmitter, Platform, PermissionsAndroid,
-    NativeModules, ScrollView, Vibration, AppState
+    NativeModules, ScrollView, Vibration, AppState,
 } from 'react-native';
-import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
-import { formatDuration } from './useLiveUptime';
+import notifee, { EventType, AndroidImportance} from '@notifee/react-native';
 import useBLEManager from './useBLEManager';
 import useBLENotifications from './useBLENotifications';
 const { AudioModule } = NativeModules;
@@ -41,6 +40,7 @@ async function displayNotification(newMessage: string) {
         body: newMessage,
         android: {
             channelId,
+
         },
     });
 }
@@ -69,6 +69,7 @@ export default function useBluetooth(
     const [isPizzaMode, setIsPizzaMode] = useState(false);
     const scrollRef = useRef<ScrollView>(null);
     const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
+
     const { isConnected,
         connectedAt,
         doConnect,
@@ -201,7 +202,6 @@ export default function useBluetooth(
         disconnectBLE,
         sendBLEData,
         addMessage,
-        formatDuration,
         voltage: voltageLevel,
         rssi: rssiLevel,
         lightLevel: lightLevelValue,

@@ -77,7 +77,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
       await BLEModule.writeToBLECharacteristic(SERVICE_UUID, CHARACTERISTIC_UUID, message);
       console.log(`Sent via BLE: ${message}`);
     } catch (error) {
-      addMessage(`Send error: ${error}`);
+      addMessage(`${message}: Send error: ${error}`);
     }
   }, [addMessage]);
 

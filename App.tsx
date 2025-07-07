@@ -9,6 +9,7 @@ import ControlPanel from './src/hooks/ControlPanel';
 import PizzaAlertModal from './src/hooks/PizzaAlertModal';
 import ThresholdModal from './src/hooks/ThresholdModal';
 import useModals from './src/hooks/UseModals';
+import { formatDuration } from './src/hooks/useLiveUptime';
 
 const App = () => {
   const [uptime, setUptime] = useState<string>('—');
@@ -44,7 +45,6 @@ const App = () => {
     doConnect,
     sendBLEData,
     doSubscribe,
-    formatDuration,
   } = useBluetooth(lightThresholdRef, handlePizzaAlert);
 
 
@@ -80,7 +80,7 @@ const App = () => {
       if (timer) { clearInterval(timer); }
       setUptime('—');
     };
-  }, [connectedAt, formatDuration]);
+  }, [connectedAt]);
 
   useEffect(() => {
     if (!isConnected && isPizzaMode) {

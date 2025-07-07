@@ -23,7 +23,7 @@ export default function useBLENotifications(
   }, []);
 
 
-  const handleChargeStatus = useCallback((message: string) => {
+  const handleChargeStatusMessage = useCallback((message: string) => {
     if (message.includes('Not')) {
       setChargingStatus(false);
     } else {
@@ -57,14 +57,10 @@ export default function useBLENotifications(
       return;
     }
     if (message.includes('Charging')) {
-      handleChargeStatus(message);
+      handleChargeStatusMessage(message);
       return;
     }
     const { voltage, rssi, lightLevel, batteryStatus } = parseBleMessage(message);
-    console.log('Battery Status: ', batteryStatus);
-    setChargingStatus(batteryStatus);
-    const rssiNum = parseFloat(rssi);
-    if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
 
     //this happens if the notification did not contain and sensor data - e.g a general message
     if (voltage.includes('Unknown') || rssi.includes('Unknown') || lightLevel.includes('Unknown')) {
@@ -74,16 +70,17 @@ export default function useBLENotifications(
       return;
     }
 
+    console.log('Battery Status: ', batteryStatus);
+    setChargingStatus(!!batteryStatus);
+
+    const rssiNum = parseFloat(rssi);
+    if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
+
     const volts = parseFloat(voltage);
-    if (isNaN(volts)) { return; }
-    setVoltageLevel(volts);
+    if (!isNaN(volts)) { setVoltageLevel(volts);}
 
     const lLevel = parseFloat(lightLevel);
-    if (isNaN(lLevel)) {
-      console.log('Invalid light level reading');
-    } else {
-      setLightLevelValue(lLevel);
-    }
+    if (!isNaN(lLevel)) {setLightLevelValue(lLevel);}
 
     if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
       addMessage('Low voltage detected!');
@@ -96,13 +93,7 @@ export default function useBLENotifications(
         displayNotification('Low Battery!');//catch(console.error);
       }
     }
-  }, [addMessage,
-    displayNotification,
-    handleChargeStatus,
-    parseBleMessage,
-    playWarningSound,
-    sendAlert,
-    setChargingStatus]);
+  }, [addMessage, displayNotification, handleChargeStatusMessage, parseBleMessage, playWarningSound, sendAlert, setChargingStatus]);
 
   return {
     voltageLevel,
@@ -110,6 +101,5 @@ export default function useBLENotifications(
     lightLevelValue,
     processDeviceMessage,
     resetAlert,
-    hasAlerted,
   };
 }
