@@ -92,8 +92,6 @@ export default function useBluetooth(
 
 
     const [isPizzaMode, setIsPizzaMode] = useState(false);
-    // const [rssiLevel, setRssiLevel] = useState<number | null>(null);
-    //const [lightLevelValue, setLightLevelValue] = useState<number | null>(null);
     const scrollRef = useRef<ScrollView>(null);
     const appState = useRef(AppState.currentState);
 
@@ -123,7 +121,6 @@ export default function useBluetooth(
         pizzaModeRef.current = isPizzaMode;
         if (isPizzaMode) {
             Vibration.vibrate(100); // 🎉 Buzz when entering Pizza Mode
-            //Vibration.vibrate([100, 200, 100, 300]);
 
         }
     }, [isPizzaMode]);
@@ -143,7 +140,7 @@ export default function useBluetooth(
         try {
             await BLEModule.writeToBLECharacteristic(SERVICE_UUID, CHARACTERISTIC_UUID, message);
             console.log(`Sent via BLE: ${message}`);
-            //addMessage(`Sent: ${message}`);//no because ESP32C3 will echo commands as notifs
+
         } catch (error) {
             addMessage(`${error}`);
         }
@@ -249,7 +246,7 @@ export default function useBluetooth(
                         if (levelToSync != null) {
                             sendBLEData(`LEVEL${levelToSync}`);
                         }
-                    }, 300); // delay is crucial
+                    }, 300); // delay is crucial?
                 }
                 const strMessage = event?.message != null ? String(event.message) : '';
                 processDeviceMessage(strMessage);
