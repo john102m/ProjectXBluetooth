@@ -6,7 +6,7 @@ export default function useBLENotifications(
   sendAlert: () => void,
   setChargingStatus: (status: boolean | null) => void,
   displayNotification: (msg: string) => void,
-  playWarningSound: () => void,
+  playAlertSound: (sound: string) => void,
   addMessage: (msg: string) => void) {
 
   const [counter, setCounter] = useState(0);
@@ -89,11 +89,11 @@ export default function useBLENotifications(
       } else {
         setCounter(0);
         hasAlerted.current = true;
-        playWarningSound();
+        playAlertSound('bing_bong');
         displayNotification('Low Battery!');//catch(console.error);
       }
     }
-  }, [addMessage, displayNotification, handleChargeStatusMessage, parseBleMessage, playWarningSound, sendAlert, setChargingStatus]);
+  }, [addMessage, displayNotification, handleChargeStatusMessage, parseBleMessage, playAlertSound, sendAlert, setChargingStatus]);
 
   return {
     voltageLevel,

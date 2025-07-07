@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import {
     DeviceEventEmitter, Platform, PermissionsAndroid,
-    NativeModules, ScrollView, Vibration, AppState,
+    NativeModules, Vibration, AppState,
 } from 'react-native';
 import notifee, { EventType, AndroidImportance} from '@notifee/react-native';
 import useBLEManager from './useBLEManager';
@@ -45,8 +45,8 @@ async function displayNotification(newMessage: string) {
     });
 }
 
-function playWarningSound() {
-    AudioModule.playAudio('bing_bong');
+function playAlertSound(sound : string) {
+    AudioModule.playAudio(sound);
     Vibration.vibrate([100, 200, 100, 300]);
 }
 
@@ -56,7 +56,6 @@ export default function useBluetooth(
         origin: 'native' | 'esp32';
         message: string;
         status?: string;
-        // other relevant fields
     };
     // State
     const appState = useRef(AppState.currentState);
@@ -67,7 +66,6 @@ export default function useBluetooth(
     }, []);
 
     const [isPizzaMode, setIsPizzaMode] = useState(false);
-    const scrollRef = useRef<ScrollView>(null);
     const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
 
     const { isConnected,
@@ -85,8 +83,7 @@ export default function useBluetooth(
     const sendAlert = useCallback(() => {
         setIsPizzaMode(false);
         sendBLEData('P_MODE_OFF');
-        Vibration.vibrate([100, 200, 100, 300]);
-        AudioModule.playAudio('major');
+        playAlertSound('major');
 
         if (appState.current === 'active') {
             if (handlePizzaAlert) {
@@ -109,7 +106,7 @@ export default function useBluetooth(
         sendAlert,
         setChargingStatus,
         displayNotification,
-        playWarningSound,
+        playAlertSound,
         addMessage);
 
     useEffect(() => {
@@ -149,7 +146,7 @@ export default function useBluetooth(
 
     const handleDisconnection = useCallback(() => {
         setDisconnected();
-        AudioModule.playAudio('bing_bong');
+        playAlertSound('bing_bong');
     }, [setDisconnected]);
 
     const handleCharacteristicFound = useCallback(() => {
@@ -162,7 +159,6 @@ export default function useBluetooth(
         const sub = DeviceEventEmitter.addListener(
             'BluetoothNotification',
             (event: BleEvent) => {
-                scrollRef.current?.scrollToEnd({ animated: true });
                 if (String(event.status).includes('Characteristic found!')) {
                     handleCharacteristicFound();
                     setIsConnected(true);
