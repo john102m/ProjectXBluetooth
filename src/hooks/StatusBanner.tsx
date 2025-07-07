@@ -38,7 +38,8 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
         }
     }, [visible, pulseAnim]);
     useEffect(() => {
-        if (chargingStatus) {
+
+        if (chargingStatus && !visible) {
             Animated.loop(
                 Animated.sequence([
                     Animated.timing(flashAnim, {
@@ -51,12 +52,14 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
                         duration: 300,
                         useNativeDriver: true,
                     }),
-                ])
+                ]),
             ).start();
         } else {
             flashAnim.setValue(0); // reset
         }
-    }, [chargingStatus, flashAnim]);
+    }, [chargingStatus, flashAnim, visible]);
+
+
 
 
     return (
