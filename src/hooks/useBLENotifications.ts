@@ -35,14 +35,14 @@ export default function useBLENotifications(
     addMessage(message);
   }, [addMessage, setChargingStatus]);
 
-  const parseBleMessage = useCallback((message: string): { voltage: string; rssi: string; lightLevel: string, batteryStatus: boolean | null } => {
+  const parseBleMessage = useCallback((message: string): { voltage: number; rssi: number; lightLevel: number, batteryStatus: boolean | null } => {
     const vMatch = message.match(/V([\d.]+)/);
     const rMatch = message.match(/R(-?\d+)/);
     const lMatch = message.match(/L([\d.]+)/);
     const bMatch = message.match(/B(\d)/);
-    const voltage = vMatch ? `${vMatch[1]} V` : 'Voltage: Unknown';
-    const rssi = rMatch ? `${rMatch[1]} dBm` : 'RSSI: Unknown';
-    const lightLevel = lMatch ? `${lMatch[1]} %` : 'Level: Unknown';
+    const voltage = vMatch ? parseFloat(vMatch[1]) : -1;
+    const rssi = rMatch ? parseFloat(rMatch[1]) : -999;
+    const lightLevel = lMatch ? parseFloat(lMatch[1]) : -1;
 
     const batteryStatus =
       bMatch && (bMatch[1] === '1' || bMatch[1] === '0')
@@ -66,7 +66,7 @@ export default function useBLENotifications(
     const { voltage, rssi, lightLevel, batteryStatus } = parseBleMessage(message);
 
     //this happens if the notification did not contain  sensor data - e.g a general message
-    if (voltage.includes('Unknown') || rssi.includes('Unknown') || lightLevel.includes('Unknown')) {
+    if (voltage === 0 || rssi === -999 || lightLevel === 0) {
       if (message.trim() !== '') {
         addMessage(message.trim());
       }
@@ -75,17 +75,12 @@ export default function useBLENotifications(
 
     console.log('Battery Status: ', batteryStatus);
     setChargingStatus(!!batteryStatus);
+    console.log('RSSI: ', rssi);
+    if (rssi > -999) { setRssiLevel(rssi); }
+    if (voltage > 0) { setVoltageLevel(voltage); }
+    if (lightLevel > 0) { setLightLevelValue(lightLevel); }
 
-    const rssiNum = parseFloat(rssi);
-    if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
-
-    const volts = parseFloat(voltage);
-    if (!isNaN(volts)) { setVoltageLevel(volts); }
-
-    const lLevel = parseFloat(lightLevel);
-    if (!isNaN(lLevel)) { setLightLevelValue(lLevel); }
-
-    if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
+    if (voltage < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
       addMessage('Low voltage detected!');
       if (counterRef.current < 2) {
         setCounter(prev => prev + 1);

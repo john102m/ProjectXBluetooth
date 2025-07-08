@@ -16,6 +16,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     setConnectedAt(new Date());
     addMessage('Connected');
   }, [addMessage]);
+
   const logDisconnection = useCallback(() => {
     if (connectedAt) {
       const duration = (Date.now() - connectedAt.getTime()) / 1000;
@@ -56,6 +57,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
         console.error(error);
       });
   }, [addMessage, logConnection]);
+
   const doUnsubscribe = useCallback(async () => {
     try {
       await BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
@@ -105,12 +107,11 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
 
   const resetBLE = useCallback(async () => {
     await disconnectBLE();
-    await doUnsubscribe();
+    await doUnsubscribe();  //?? after disconnecting ??
     setIsConnected(false);
     setIsSubscribed(false);
     setConnectedAt(null);
   }, [disconnectBLE, doUnsubscribe]);
-
 
   return {
     isConnected,
