@@ -77,6 +77,7 @@ export default function useBluetooth(
         sendBLEData,
         isSubscribed,
         doSubscribe,
+        doUnsubscribe,
         setIsSubscribed,
     } = useBLEManager(addMessage);
 
@@ -153,7 +154,6 @@ export default function useBluetooth(
         doSubscribe();
     }, [doSubscribe]);
 
-
     // BLE Event listener
     useEffect(() => {
         const sub = DeviceEventEmitter.addListener(
@@ -177,11 +177,10 @@ export default function useBluetooth(
                 processDeviceMessage(strMessage);
             }
         );
-
         return () => {
             sub.remove();
-            setIsSubscribed(false);
-            //BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
+            //setIsSubscribed(false);
+            //disconnectBLE();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [handleCharacteristicFound, handleDisconnection, processDeviceMessage]);
@@ -195,6 +194,7 @@ export default function useBluetooth(
         setIsPizzaMode,
         doConnect,
         doSubscribe,
+        doUnsubscribe,
         disconnectBLE,
         sendBLEData,
         addMessage,

@@ -1,5 +1,5 @@
 // useBLENotifications.ts
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 const VOLTAGE_WARNING_THRESHOLD = 1.4;
 
 export default function useBLENotifications(
@@ -22,6 +22,9 @@ export default function useBLENotifications(
     console.log('Alert state reset');
   }, []);
 
+  useEffect(() => {
+    counterRef.current = counter;
+  }, [counter]);
 
   const handleChargeStatusMessage = useCallback((message: string) => {
     if (message.includes('Not')) {
@@ -62,7 +65,7 @@ export default function useBLENotifications(
     }
     const { voltage, rssi, lightLevel, batteryStatus } = parseBleMessage(message);
 
-    //this happens if the notification did not contain and sensor data - e.g a general message
+    //this happens if the notification did not contain  sensor data - e.g a general message
     if (voltage.includes('Unknown') || rssi.includes('Unknown') || lightLevel.includes('Unknown')) {
       if (message.trim() !== '') {
         addMessage(message.trim());
@@ -77,10 +80,10 @@ export default function useBLENotifications(
     if (!isNaN(rssiNum)) { setRssiLevel(rssiNum); }
 
     const volts = parseFloat(voltage);
-    if (!isNaN(volts)) { setVoltageLevel(volts);}
+    if (!isNaN(volts)) { setVoltageLevel(volts); }
 
     const lLevel = parseFloat(lightLevel);
-    if (!isNaN(lLevel)) {setLightLevelValue(lLevel);}
+    if (!isNaN(lLevel)) { setLightLevelValue(lLevel); }
 
     if (volts < VOLTAGE_WARNING_THRESHOLD && !hasAlerted.current) {
       addMessage('Low voltage detected!');

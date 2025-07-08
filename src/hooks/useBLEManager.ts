@@ -16,7 +16,6 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     setConnectedAt(new Date());
     addMessage('Connected');
   }, [addMessage]);
-
   const logDisconnection = useCallback(() => {
     if (connectedAt) {
       const duration = (Date.now() - connectedAt.getTime()) / 1000;
@@ -57,8 +56,17 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
         console.error(error);
       });
   }, [addMessage, logConnection]);
+  const doUnsubscribe = useCallback(async () => {
+    try {
+      await BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
+      setIsSubscribed(false);
+    } catch (e) {
+      addMessage(`Unsubscribe error: ${e}`);
+    }
+  }, [addMessage]);
 
   const disconnectBLE = useCallback(async () => {
+    await doUnsubscribe();
     addMessage('Disconnecting BLE...');
     BLEModule.disconnectBLE()
       .then((result: any) => {
@@ -70,7 +78,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
       .catch((error: any) => {
         addMessage(`Disconnect error: ${error}`);
       });
-  }, [addMessage, logDisconnection]);
+  }, [addMessage, doUnsubscribe, logDisconnection]);
 
   const sendBLEData = useCallback(async (message: string) => {
     try {
@@ -82,6 +90,10 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
   }, [addMessage]);
 
   const doSubscribe = useCallback(async () => {
+    if(isSubscribed){
+      addMessage('Already subscribed');
+      return;
+    }
     try {
       await BLEModule.subscribeToBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
       AudioModule.playAudio('chime');
@@ -89,16 +101,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     } catch (e) {
       addMessage(`Subscription error: ${e}`);
     }
-  }, [addMessage]);
-
-  const doUnsubscribe = useCallback(async () => {
-    try {
-      await BLEModule.unsubscribeFromBLENotifications(SERVICE_UUID, CHARACTERISTIC_UUID);
-      setIsSubscribed(false);
-    } catch (e) {
-      addMessage(`Unsubscribe error: ${e}`);
-    }
-  }, [addMessage]);
+  }, [addMessage, isSubscribed]);
 
   const resetBLE = useCallback(async () => {
     await disconnectBLE();
