@@ -76,6 +76,8 @@ export default function useBLENotifications(
     console.log('Battery Status: ', batteryStatus);
     setChargingStatus(!!batteryStatus);
     console.log('RSSI: ', rssi);
+    console.log('Voltage: ', voltage);
+    console.log('Light level: ', lightLevel);
     if (rssi > -999) { setRssiLevel(rssi); }
     if (voltage > 0) { setVoltageLevel(voltage); }
     if (lightLevel > 0) { setLightLevelValue(lightLevel); }

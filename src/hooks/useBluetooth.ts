@@ -171,7 +171,7 @@ export default function useBluetooth(
                         if (levelToSync != null) {
                             sendBLEData(`LEVEL${levelToSync}`);
                         }
-                    }, 300); // delay is crucial
+                    }, 300); // delay is crucial?
                 }
                 const strMessage = event?.message != null ? String(event.message) : '';
                 processDeviceMessage(strMessage);
