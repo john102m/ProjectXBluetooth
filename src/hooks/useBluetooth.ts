@@ -75,10 +75,14 @@ export default function useBluetooth(
         logDisconnection,
         disconnectBLE,
         sendBLEData,
+        scanBLEDevices,
+        stopBLEScan,
         isSubscribed,
         doSubscribe,
         doUnsubscribe,
         setIsSubscribed,
+        foundDevices,
+        setFoundDevices,
     } = useBLEManager(addMessage);
 
     const sendAlert = useCallback(() => {
@@ -197,11 +201,16 @@ export default function useBluetooth(
         doUnsubscribe,
         disconnectBLE,
         sendBLEData,
+        scanBLEDevices,
+        stopBLEScan,
+        foundDevices,
+        setFoundDevices,
         addMessage,
         voltage: voltageLevel,
         rssi: rssiLevel,
         lightLevel: lightLevelValue,
         connectedAt,
+        lightThresholdRef,
     };
 }
 

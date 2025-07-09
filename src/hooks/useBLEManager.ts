@@ -1,16 +1,40 @@
-import { useState, useCallback } from 'react';
-import { PermissionsAndroid, NativeModules } from 'react-native';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { NativeEventEmitter, PermissionsAndroid, NativeModules, Platform } from 'react-native';
 import { formatDuration } from './useLiveUptime';
 
 const { BLEModule, AudioModule } = NativeModules;
+const bleEmitter = new NativeEventEmitter(BLEModule);
 
 const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
 const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+let isScanning = false;
+
 
 export default function useBLEManager(addMessage: (msg: string) => void) {
   const [isConnected, setIsConnected] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [connectedAt, setConnectedAt] = useState<Date | null>(null);
+
+const [foundDevices, setFoundDevices] = useState<{ name: string; address: string }[]>([]);
+const seenDevicesRef = useRef<Set<string>>(new Set());
+
+useEffect(() => {
+  const subscription = bleEmitter.addListener('BLEDeviceFound', (device) => {
+    const address = device?.address;
+    const name = device?.name || 'Unnamed';
+    if (!address || seenDevicesRef.current.has(address)) {
+      return;
+    }
+    seenDevicesRef.current.add(address);
+    setFoundDevices(prev => [...prev, { name, address }]);
+    addMessage(`📡 ${name} - ${address}`);
+  });
+
+  return () => subscription.remove();
+}, [addMessage]);
+
+
+
 
   const logConnection = useCallback(() => {
     setConnectedAt(new Date());
@@ -92,7 +116,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
   }, [addMessage]);
 
   const doSubscribe = useCallback(async () => {
-    if(isSubscribed){
+    if (isSubscribed) {
       addMessage('Already subscribed');
       return;
     }
@@ -105,9 +129,98 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     }
   }, [addMessage, isSubscribed]);
 
+  async function requestPermissions() {
+    if (Platform.OS !== 'android') {
+      return true; // iOS handles differently
+    }
+
+    // Android 12+ requires BLUETOOTH_SCAN, BLUETOOTH_CONNECT, and ACCESS_FINE_LOCATION
+    if (Platform.Version >= 31) {
+      const permissionsToRequest = [
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ];
+
+      // Check each permission first
+      for (const permission of permissionsToRequest) {
+        const hasPermission = await PermissionsAndroid.check(permission);
+        if (!hasPermission) {
+          const granted = await PermissionsAndroid.request(permission, {
+            title: 'Bluetooth Permission',
+            message: 'This app needs Bluetooth permissions to scan and connect devices',
+            buttonPositive: 'OK',
+          });
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            return false; // permission denied
+          }
+        }
+      }
+    } else {
+      // For Android < 12, only location permission is required for BLE scan
+      const hasLocationPermission = await PermissionsAndroid.check(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+      );
+      if (!hasLocationPermission) {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'This app needs location permission to scan Bluetooth devices',
+            buttonPositive: 'OK',
+          }
+        );
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          return false;
+        }
+      }
+    }
+
+    return true; // all permissions granted
+  }
+  const stopBLEScan = useCallback(() => {
+    try {
+      BLEModule.stopBLEScan();
+      addMessage('🛑 Stopped BLE scan');
+    } catch (error) {
+      addMessage(`Stop scan error: ${error}`);
+    }
+  }, [addMessage]);
+
+  const scanBLEDevices = useCallback(async () => {
+    if (isScanning) {
+      addMessage('Scan already in progress');
+      return;
+    }
+    isScanning = true;
+
+    const hasPermissions = await requestPermissions();
+    if (!hasPermissions) {
+      console.warn('Permissions denied. Cannot scan.');
+      return;
+    }
+
+    try {
+      await BLEModule.scanBLEDevices();
+      addMessage('🔍 BLE scan started...');
+
+      setTimeout(() => {
+        stopBLEScan();
+      }, 7000);
+    } catch (error) {
+      addMessage(`Scan failed: ${error}`);
+      return null;
+    } finally {
+      isScanning = false;
+    }
+  }, [addMessage, stopBLEScan]);
+
+
+
   const resetBLE = useCallback(async () => {
+    await doUnsubscribe();
     await disconnectBLE();
-    await doUnsubscribe();  //?? after disconnecting ??
+
     setIsConnected(false);
     setIsSubscribed(false);
     setConnectedAt(null);
@@ -127,5 +240,9 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     logDisconnection,
     setIsSubscribed,
     resetBLE,
+    scanBLEDevices,
+    stopBLEScan,
+    foundDevices,
+    setFoundDevices,
   };
 }

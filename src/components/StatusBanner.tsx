@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Animated, Text, View, StyleSheet } from 'react-native';
-import { uptimeColor } from './useLiveUptime';
+import { uptimeColor } from '../hooks/useLiveUptime';
 type Props = {
     visible: boolean;
     threshold: number;
@@ -59,9 +59,6 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
         }
     }, [chargingStatus, flashAnim, visible]);
 
-
-
-
     return (
         <View style={styles.container}>
             {visible ? (
@@ -70,12 +67,6 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
                 </Animated.View>
             ) : (
                 <View style={styles.headerRow}>
-                    <Text
-                        numberOfLines={1}
-                        style={styles.titleText}
-                    >
-                        🍕 PizzaBot
-                    </Text>
 
                     <Text
                         numberOfLines={1}
@@ -119,17 +110,17 @@ const styles = StyleSheet.create({
         marginTop: -4,
     },
     container: {
-        height: 70,
+        height: 60,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: '#FFD700',
         paddingHorizontal: 22,
         width: '100%',
-        paddingVertical: 10,
+        paddingVertical: 5,
     },
     banner: {
         backgroundColor: 'orange',
-        padding: 10,
+        padding: 5,
         borderRadius: 8,
         width: '90%',
         alignItems: 'center',

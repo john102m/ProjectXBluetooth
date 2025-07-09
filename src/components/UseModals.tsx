@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type ModalType = 'pizza' | 'threshold' | null;
+export type ModalType = 'pizza' | 'threshold' | null;
 
 export default function useModals() {
   const [modalType, setModalType] = useState<ModalType>(null);

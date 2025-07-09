@@ -46,7 +46,7 @@ export default function SystemStatus({
 
 const styles = StyleSheet.create({
   container: {
-    margin: 20,
+    margin: 10,
     padding: 12,
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
