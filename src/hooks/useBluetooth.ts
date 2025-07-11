@@ -83,6 +83,7 @@ export default function useBluetooth(
         setIsSubscribed,
         foundDevices,
         setFoundDevices,
+        clearFoundDevices,
     } = useBLEManager(addMessage);
 
     const sendAlert = useCallback(() => {
@@ -217,6 +218,7 @@ export default function useBluetooth(
         stopBLEScan,
         foundDevices,
         setFoundDevices,
+        clearFoundDevices,
         addMessage,
         voltage: voltageLevel,
         rssi: rssiLevel,

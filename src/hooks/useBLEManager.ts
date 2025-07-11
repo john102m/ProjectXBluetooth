@@ -1,14 +1,15 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { NativeEventEmitter, PermissionsAndroid, NativeModules, Platform } from 'react-native';
 import { formatDuration } from './useLiveUptime';
-
+import AsyncStorage from '@react-native-async-storage/async-storage';
 const { BLEModule, AudioModule } = NativeModules;
 const bleEmitter = new NativeEventEmitter(BLEModule);
 
 const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
 const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
-let isScanning = false;
+const LAST_DEVICE_KEY = 'lastConnectedDeviceAddress';
 
+let isScanning = false;
 
 export default function useBLEManager(addMessage: (msg: string) => void) {
   const [isConnected, setIsConnected] = useState(false);
@@ -17,6 +18,12 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
 
   const [foundDevices, setFoundDevices] = useState<{ name: string; address: string }[]>([]);
   const seenDevicesRef = useRef<Set<string>>(new Set());
+
+  // Clear the found devices list
+  const clearFoundDevices = () => {
+    setFoundDevices([]);
+    seenDevicesRef.current.clear();  // Also clear your 'seenDevices' to allow rediscovery
+  };
 
   useEffect(() => {
     const subscription = bleEmitter.addListener('BLEDeviceFound', (device) => {
@@ -49,7 +56,7 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     }
   }, [connectedAt, addMessage]);
 
-  const doConnect = useCallback(async () => {
+  const doConnect = useCallback(async (address: string) => {
     const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
 
     if (!granted) {
@@ -67,16 +74,19 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
       }
     }
 
-    BLEModule.connectToKnownBLEDevice()
-      .then((result: any) => {
-        logConnection();
-        setIsConnected(true);
-        addMessage(`BLE Connect Result: ${result}`);
-      })
-      .catch((error: any) => {
-        addMessage(`BLE Connect Error: ${error}`);
-        console.error(error);
-      });
+    try {
+      const result = await BLEModule.connectToBLEDevice(address);
+      logConnection();
+      setIsConnected(true);
+      addMessage(`BLE Connect Result: ${result}`);
+
+      // Persist last connected device on success
+      console.log('Saving last device address: ', address);
+      await AsyncStorage.setItem(LAST_DEVICE_KEY, address);
+    } catch (error) {
+      addMessage(`BLE Connect Error: ${error}`);
+      console.error(error);
+    }
   }, [addMessage, logConnection]);
 
   const doUnsubscribe = useCallback(async () => {
@@ -241,5 +251,6 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
     stopBLEScan,
     foundDevices,
     setFoundDevices,
+    clearFoundDevices,
   };
 }

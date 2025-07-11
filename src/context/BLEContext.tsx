@@ -1,14 +1,18 @@
-// context/BLEContext.tsx
 import React, { createContext, useRef, useCallback, useContext, useEffect, useState } from 'react';
 import useBluetooth from '../hooks/useBluetooth';
 import useModals, { ModalType } from '../components/UseModals';
 import { formatDuration } from '../hooks/useLiveUptime';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type BLEContextType = {
     ble: ReturnType<typeof useBluetooth> & {
         lightThresholdRef: React.RefObject<number>;
         autoModeRef: React.RefObject<boolean>;
         uptime: string;
+        setShouldAutoConnect: (val: boolean) => void;  // <-- Changed here
+        shouldAutoConnect: boolean;
+        lastConnectedDevice: string | null;
+
     };
     modals: {
         showModal: (type: ModalType, props?: {}) => void;
@@ -19,12 +23,17 @@ type BLEContextType = {
     };
 };
 
+const STORAGE_KEY = 'autoConnectEnabled';
+const LAST_DEVICE_KEY = 'lastConnectedDeviceAddress';
+
 const BLEContext = createContext<BLEContextType | null>(null);
 
 export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     const [uptime, setUptime] = useState('—');
     const lightThresholdRef = useRef(80);
     const autoModeRef = useRef(true);
+    const [shouldAutoConnect, _setShouldAutoConnect] = useState(true);
+    const [lastConnectedDevice, setLastConnectedDevice] = useState<string | null>(null);
 
     const {
         showModal,
@@ -39,7 +48,35 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     }, [showModal, hideModal]);
 
     const ble = useBluetooth(lightThresholdRef, autoModeRef, handlePizzaAlert);
-    const { connectedAt } = ble; // ✅ Now we can use it!
+    const { connectedAt } = ble;
+
+    // Load persisted value once on mount
+    useEffect(() => {
+        (async () => {
+            try {
+                const savedAutoConnect = await AsyncStorage.getItem(STORAGE_KEY);
+                const savedDevice = await AsyncStorage.getItem(LAST_DEVICE_KEY);
+
+                if (savedAutoConnect !== null) {
+                    _setShouldAutoConnect(savedAutoConnect === 'true');
+                }
+                if (savedDevice) {
+                    setLastConnectedDevice(savedDevice);
+                }
+            } catch (e) {
+                console.warn('Failed to load persisted settings', e);
+            }
+        })();
+    }, []);
+
+
+    // Sync setter + persist to AsyncStorage (fire and forget)
+    const setShouldAutoConnect = (val: boolean) => {
+        _setShouldAutoConnect(val);
+        AsyncStorage.setItem(STORAGE_KEY, val.toString()).catch(e =>
+            console.warn('Failed to save autoConnect setting', e)
+        );
+    };
 
     useEffect(() => {
         let timer: ReturnType<typeof setInterval>;
@@ -58,12 +95,14 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     }, [connectedAt]);
 
     const value: BLEContextType = {
-        ble: {          // ✅ Make available to everyone
+        ble: {
             ...ble,
             lightThresholdRef,
             autoModeRef,
             uptime,
-
+            shouldAutoConnect,
+            setShouldAutoConnect,
+            lastConnectedDevice,
         },
         modals: {
             showModal,
@@ -76,7 +115,6 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
 
     return <BLEContext.Provider value={value}>{children}</BLEContext.Provider>;
 };
-
 
 export const useBLE = () => {
     const ctx = useContext(BLEContext);

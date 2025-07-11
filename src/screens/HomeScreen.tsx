@@ -45,6 +45,8 @@ const HomeScreen = () => {
     lightThresholdRef,
     autoModeRef,
     uptime,
+    shouldAutoConnect,
+    lastConnectedDevice,
     setIsPizzaMode,
     doConnect,
     sendBLEData,
@@ -63,6 +65,9 @@ const HomeScreen = () => {
     console.log('🍕 isModalVisible:', isModalVisible);
   }, [modalType, isModalVisible]);
 
+  useEffect(() => {
+    console.log('👀 shouldAutoConnect is now:', shouldAutoConnect);
+  }, [shouldAutoConnect]);
 
   useEffect(() => {
     if (!isConnected && isPizzaMode) {
@@ -76,12 +81,12 @@ const HomeScreen = () => {
 
 
   useEffect(() => {
-    console.log('you are here');
-    doConnect();
-    return () => {
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    //const savedAddress = '94:A9:90:48:02:FA'; // 🧠 Could come from storage later
+    console.log('Last connected device: ', lastConnectedDevice ?? 'Not found');
+    if (!isConnected && lastConnectedDevice && shouldAutoConnect) {
+      doConnect(lastConnectedDevice);
+    }
+  }, [doConnect, isConnected, lastConnectedDevice, shouldAutoConnect]);
 
   const handleThresholdOpen = useCallback(() => {
     showModal('threshold');
@@ -91,8 +96,8 @@ const HomeScreen = () => {
     const nextMode = !isPizzaMode;
     setIsPizzaMode(nextMode);
     sendBLEData(nextMode ? 'P_MODE_ON' : 'P_MODE_OFF');
-
   };
+
 
   const thresholdSavedAction = () => {
     const parsed = parseFloat(inputValue);
@@ -174,7 +179,6 @@ const HomeScreen = () => {
             },
           ]}
         />
-
         <View style={{ marginTop: 5, paddingHorizontal: 20, borderRadius: 55 }}>
           <SystemStatus
             isConnected={isConnected}
