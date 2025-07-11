@@ -7,6 +7,7 @@ import { formatDuration } from '../hooks/useLiveUptime';
 type BLEContextType = {
     ble: ReturnType<typeof useBluetooth> & {
         lightThresholdRef: React.RefObject<number>;
+        autoModeRef: React.RefObject<boolean>;
         uptime: string;
     };
     modals: {
@@ -22,7 +23,8 @@ const BLEContext = createContext<BLEContextType | null>(null);
 
 export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     const [uptime, setUptime] = useState('—');
-    const lightThresholdRef = useRef(10);
+    const lightThresholdRef = useRef(80);
+    const autoModeRef = useRef(true);
 
     const {
         showModal,
@@ -36,7 +38,7 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
         showModal('pizza', { onDismiss: hideModal });
     }, [showModal, hideModal]);
 
-    const ble = useBluetooth(lightThresholdRef, handlePizzaAlert);
+    const ble = useBluetooth(lightThresholdRef, autoModeRef, handlePizzaAlert);
     const { connectedAt } = ble; // ✅ Now we can use it!
 
     useEffect(() => {
@@ -56,10 +58,12 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     }, [connectedAt]);
 
     const value: BLEContextType = {
-        ble: {
+        ble: {          // ✅ Make available to everyone
             ...ble,
             lightThresholdRef,
-            uptime, // ✅ Make uptime available to everyone
+            autoModeRef,
+            uptime,
+
         },
         modals: {
             showModal,

@@ -36,7 +36,7 @@ const App = () => {
             component={ConnectScreen}
             options={{
               ...sharedHeaderOptions,
-              title: '🔌 Controls',
+              title: '📡 Scan',
             }}
           />
         </Stack.Navigator>

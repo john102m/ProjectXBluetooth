@@ -22,6 +22,14 @@ export default function useBLENotifications(
     console.log('Alert state reset');
   }, []);
 
+  const setAlert = useCallback(() => {
+    hasAlerted.current = true;
+    setCounter(0);
+    playAlertSound('bing_bong');
+    displayNotification('Low Battery!');//catch(console.error);
+    console.log('Alert state set');
+  }, [displayNotification, playAlertSound]);
+
   useEffect(() => {
     counterRef.current = counter;
   }, [counter]);
@@ -87,13 +95,15 @@ export default function useBLENotifications(
       if (counterRef.current < 2) {
         setCounter(prev => prev + 1);
       } else {
-        setCounter(0);
-        hasAlerted.current = true;
-        playAlertSound('bing_bong');
-        displayNotification('Low Battery!');//catch(console.error);
+        setAlert();
+        // setCounter(0);
+        // hasAlerted.current = true;
+        // playAlertSound('bing_bong');
+        // displayNotification('Low Battery!');//catch(console.error);
       }
     }
-  }, [addMessage, displayNotification, handleChargeStatusMessage, parseBleMessage, playAlertSound, sendAlert, setChargingStatus]);
+  }, [addMessage, handleChargeStatusMessage, parseBleMessage, sendAlert, setAlert, setChargingStatus]);
+ // }, [addMessage, displayNotification, handleChargeStatusMessage, parseBleMessage, playAlertSound, sendAlert, setChargingStatus]);
 
   return {
     voltageLevel,

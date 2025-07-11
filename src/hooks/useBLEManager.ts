@@ -15,26 +15,23 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [connectedAt, setConnectedAt] = useState<Date | null>(null);
 
-const [foundDevices, setFoundDevices] = useState<{ name: string; address: string }[]>([]);
-const seenDevicesRef = useRef<Set<string>>(new Set());
+  const [foundDevices, setFoundDevices] = useState<{ name: string; address: string }[]>([]);
+  const seenDevicesRef = useRef<Set<string>>(new Set());
 
-useEffect(() => {
-  const subscription = bleEmitter.addListener('BLEDeviceFound', (device) => {
-    const address = device?.address;
-    const name = device?.name || 'Unnamed';
-    if (!address || seenDevicesRef.current.has(address)) {
-      return;
-    }
-    seenDevicesRef.current.add(address);
-    setFoundDevices(prev => [...prev, { name, address }]);
-    addMessage(`📡 ${name} - ${address}`);
-  });
+  useEffect(() => {
+    const subscription = bleEmitter.addListener('BLEDeviceFound', (device) => {
+      const address = device?.address;
+      const name = device?.name || 'Unnamed';
+      if (!address || seenDevicesRef.current.has(address)) {
+        return;
+      }
+      seenDevicesRef.current.add(address);
+      setFoundDevices(prev => [...prev, { name, address }]);
+      addMessage(`📡 ${name} - ${address}`);
+    });
 
-  return () => subscription.remove();
-}, [addMessage]);
-
-
-
+    return () => subscription.remove();
+  }, [addMessage]);
 
   const logConnection = useCallback(() => {
     setConnectedAt(new Date());

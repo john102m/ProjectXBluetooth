@@ -10,6 +10,7 @@ type Props = {
   lightLevel?: number | null;
   latestMessage?: string;
   connectedAt: Date | null;
+  isAutoMode: boolean; // 👈 New prop!
 };
 
 // 👇 Named utility function
@@ -28,6 +29,7 @@ export default function SystemStatus({
   lightLevel,
   latestMessage,
   connectedAt,
+  isAutoMode,
 }: Props) {
   return (
     <View style={styles.container}>
@@ -37,7 +39,7 @@ export default function SystemStatus({
       <Text>Voltage: {voltage ?? '—'} V</Text>
       <Text>RSSI: {rssi ?? '—'} dBm</Text>
       <Text>Light Level: {lightLevel ?? '—'}%</Text>
-      <Text>Threshold: {threshold}%</Text>
+      <Text>{isAutoMode ? 'Ambient:' : 'Absolute:'} {threshold}%</Text>
       <Text>Message: {latestMessage || '—'}</Text>
       <Text>Connected At: {formatTimestamp(connectedAt)}</Text>
     </View>

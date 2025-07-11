@@ -4,12 +4,13 @@ import { uptimeColor } from '../hooks/useLiveUptime';
 type Props = {
     visible: boolean;
     threshold: number;
+    autoMode: boolean;
     uptime: string;
     chargingStatus: boolean | null; // e.g. "Charging" or "Not Charging"
 };
 
 
-export default function StatusBanner({ visible, threshold, uptime, chargingStatus }: Props) {
+export default function StatusBanner({ visible, threshold, autoMode, uptime, chargingStatus }: Props) {
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const flashAnim = useRef(new Animated.Value(1)).current;
 
@@ -17,6 +18,15 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
         ...styles.emojiWrapper,
         backgroundColor: chargingStatus ? 'green' : '#FFD700',
     };
+    const uptimeWrapperStyle = {
+        ...styles.uptimeLabel,
+        color: uptimeColor(uptime),
+    };
+    const autoDotStyle = {
+        ...styles.autoDot,
+        backgroundColor: autoMode ? '#228B22' : '#8B0000', // green = on, red = off
+    };
+
     useEffect(() => {
         if (visible) {
             Animated.loop(
@@ -67,39 +77,69 @@ export default function StatusBanner({ visible, threshold, uptime, chargingStatu
                 </Animated.View>
             ) : (
                 <View style={styles.headerRow}>
-
-                    <Text
-                        numberOfLines={1}
-                        // eslint-disable-next-line react-native/no-inline-styles
-                        style={{
-                            fontSize: 16,
-                            color: uptimeColor(uptime),
-                        }}
-                    >
-                        🕒 Uptime: {uptime}
-                    </Text>
-
-                    <View style={emojiWrapperStyle}>
+                    <View style={styles.uptimeWrapper}>
+                        <Text style={uptimeWrapperStyle}>
+                            🕒 Uptime: {uptime}
+                        </Text>
+                        <View style={styles.modeIndicator}>
+                            <Text style={styles.amLabel}>AUTO</Text>
+                            <View
+                                style={autoDotStyle}
+                            />
+                        </View>
+                    </View>
+                    {chargingStatus && <View style={emojiWrapperStyle}>
                         <Animated.Text style={[styles.emojiText, { opacity: flashAnim }]}>
                             ⚡
                         </Animated.Text>
-                    </View>
-
+                    </View>}
                 </View>
             )}
         </View>
     );
 }
 
-
 const styles = StyleSheet.create({
+    uptimeWrapper: {
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modeIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    amLabel: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginRight: 4,
+        color: '#333',
+    },
+    autoDot: {
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        borderWidth: 1,
+        borderColor: 'white',
+    },
+    uptimeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    uptimeLabel: {
+        paddingLeft: 25,
+        fontSize: 16,
+    },
     emojiWrapper: {
         width: 28,
         height: 28,
         borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: 8,
+        marginLeft: 2,
+        marginRight: 20,
     },
     emojiText: {
         color: 'white',

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, View, Text, TextInput, StyleSheet } from 'react-native';
+import { Modal, View, Text, StyleSheet } from 'react-native';
+import Slider from '@react-native-community/slider';
 import CustomButton from './CustomButton';
 
 type Props = {
@@ -8,6 +9,7 @@ type Props = {
   onChangeInput: (value: string) => void;
   onSave: () => void;
   onClose: () => void;
+  isAutoMode: boolean; // 👈 New prop!
 };
 
 export default function ThresholdModal({
@@ -16,6 +18,7 @@ export default function ThresholdModal({
   onChangeInput,
   onSave,
   onClose,
+  isAutoMode,
 }: Props) {
   return (
     <Modal
@@ -27,13 +30,24 @@ export default function ThresholdModal({
       <View style={styles.backdrop}>
         <View style={styles.modalBox}>
           <Text style={styles.label}>Set Light Threshold</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={inputValue}
-            onChangeText={onChangeInput}
-            placeholder="Enter value"
+
+          <Text style={styles.sliderLabel}>
+            {isAutoMode
+              ? `Ambient: ${inputValue || '50'}%`
+              : `Absolute: ${inputValue || '50'}%`}
+          </Text>
+          <Slider
+            // eslint-disable-next-line react-native/no-inline-styles
+            style={{ width: '100%', height: 40 }}
+            minimumValue={1}
+            maximumValue={100}
+            step={1}
+            value={parseFloat(inputValue) || 50}
+            onValueChange={(val) => onChangeInput(val.toString())}
+            minimumTrackTintColor="#FFA500"
+            thumbTintColor="#FFD700"
           />
+
           <CustomButton
             title="💾 Save Threshold"
             onPress={onSave}
@@ -63,10 +77,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 10,
   },
-  input: {
-    borderBottomWidth: 1,
-    marginBottom: 10,
+  sliderLabel: {
     fontSize: 16,
-    paddingVertical: 5,
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });

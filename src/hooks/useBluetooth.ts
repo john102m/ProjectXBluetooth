@@ -4,7 +4,7 @@ import {
     DeviceEventEmitter, Platform, PermissionsAndroid,
     NativeModules, Vibration, AppState,
 } from 'react-native';
-import notifee, { EventType, AndroidImportance} from '@notifee/react-native';
+import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
 import useBLEManager from './useBLEManager';
 import useBLENotifications from './useBLENotifications';
 const { AudioModule } = NativeModules;
@@ -45,13 +45,13 @@ async function displayNotification(newMessage: string) {
     });
 }
 
-function playAlertSound(sound : string) {
+function playAlertSound(sound: string) {
     AudioModule.playAudio(sound);
     Vibration.vibrate([100, 200, 100, 300]);
 }
 
 export default function useBluetooth(
-    lightThresholdRef: React.RefObject<number>, handlePizzaAlert?: () => void) {
+    lightThresholdRef: React.RefObject<number>, autoModeRef: React.RefObject<boolean>, handlePizzaAlert?: () => void) {
     type BleEvent = {
         origin: 'native' | 'esp32';
         message: string;
@@ -157,6 +157,12 @@ export default function useBluetooth(
     const handleCharacteristicFound = useCallback(() => {
         doSubscribe();
     }, [doSubscribe]);
+    const generateSyncCommand = (threshold: number, isAuto: boolean) => {
+        const tag = isAuto ? 'P' : 'L';
+        const mode = isAuto ? 'A1' : 'A0';
+        return `SYNC|${tag}${threshold}|${mode}`;
+    };
+
 
     // BLE Event listener
     useEffect(() => {
@@ -171,16 +177,22 @@ export default function useBluetooth(
                 } else if (String(event.message).includes('Charging')) {
                     console.log('Charge message received');
                     setTimeout(() => {
-                        const levelToSync = lightThresholdRef.current;
-                        if (levelToSync != null) {
-                            sendBLEData(`LEVEL${levelToSync}`);
+
+                        const modeToSync = autoModeRef?.current;
+                        const levelToSync = lightThresholdRef?.current;
+                        if (typeof levelToSync === 'number' && typeof modeToSync === 'boolean') {
+                            sendBLEData(generateSyncCommand(levelToSync, modeToSync));
+                            console.log('📡 SYNC →', generateSyncCommand(levelToSync, modeToSync));
+
                         }
-                    }, 300); // delay is crucial?
+
+                    }, 300);
                 }
                 const strMessage = event?.message != null ? String(event.message) : '';
                 processDeviceMessage(strMessage);
             }
         );
+
         return () => {
             sub.remove();
             //setIsSubscribed(false);

@@ -1,9 +1,9 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { SafeAreaView, View, Animated } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { SafeAreaView, View } from 'react-native';
 import SystemStatus from '../components/SystemStatus';
 import StatusBanner from '../components/StatusBanner';
-import ControlPanel from '../components/ControlPanel';
+import ControlPanelGeneric from '../components/ControlPanelGeneric';
 import PizzaAlertModal from '../components/PizzaAlertModal';
 import ThresholdModal from '../components/ThresholdModal';
 import { useNavigation } from '@react-navigation/native';
@@ -12,6 +12,18 @@ import type { RootStackParamList } from '../../src/types/navigation';
 import { useBLE } from '../context/BLEContext';
 
 type HomeNavProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+
+// ✅ Place this after imports, before HomeScreen
+
+// good for binding static parameters
+export const wrap = <T,>(fn: (val: T) => void, param: T): (() => void) => {
+  return () => fn(param);
+};
+export const wrapAsync = <T,>(fn: (val: T) => Promise<void>, param: T): (() => Promise<void>) => {
+  return () => fn(param);
+};
+
+// usage:  { label: 'Send PING', action: wrapAsync(sendBLEDataAsync, 'PING'), row: 1, col: 1 }
 
 const HomeScreen = () => {
 
@@ -31,6 +43,7 @@ const HomeScreen = () => {
     connectedAt,
     chargingStatus,
     lightThresholdRef,
+    autoModeRef,
     uptime,
     setIsPizzaMode,
     doConnect,
@@ -45,22 +58,6 @@ const HomeScreen = () => {
     modalProps,
   } = modals;
 
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const triggerAnimation = () => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 1.2,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
   useEffect(() => {
     console.log('🍕 modalType:', modalType);
     console.log('🍕 isModalVisible:', isModalVisible);
@@ -77,26 +74,6 @@ const HomeScreen = () => {
   //Persist connection state between screens using either React Context or a global store like Zustand or Redux.
   //Consider conditional rendering if the device isn’t connected — e.g., hide ControlScreen until connected.
 
-  useEffect(() => {
-    if (isPizzaMode) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 0.3,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1); // reset
-    }
-  }, [isPizzaMode, pulseAnim]);
 
   useEffect(() => {
     console.log('you are here');
@@ -110,6 +87,33 @@ const HomeScreen = () => {
     showModal('threshold');
   }, [showModal]);
 
+  const pizzaModeButtonAction = () => {
+    const nextMode = !isPizzaMode;
+    setIsPizzaMode(nextMode);
+    sendBLEData(nextMode ? 'P_MODE_ON' : 'P_MODE_OFF');
+
+  };
+
+  const thresholdSavedAction = () => {
+    const parsed = parseFloat(inputValue);
+    if (!isNaN(parsed)) {
+      lightThresholdRef.current = parsed;
+      if (isConnected) {
+        if (autoModeRef.current) {
+          // Send as percentage multiplier e.g. "CALC80" = 80%
+          sendBLEData(`CALC${inputValue}`);
+        } else {
+          // Normal manual threshold
+          sendBLEData(`LEVEL${inputValue}`);
+        }
+      }
+    }
+
+    setInputValue(lightThresholdRef.current.toString());
+    hideModal();
+
+  };
+
   return (
     <> {/* These show the modals when visible */}
       {modalType === 'threshold' && (
@@ -117,23 +121,12 @@ const HomeScreen = () => {
           visible={isModalVisible}
           inputValue={inputValue}
           onChangeInput={setInputValue}
-          onSave={() => {
-            const parsed = parseFloat(inputValue);
-            if (!isNaN(parsed)) {
-              lightThresholdRef.current = parsed;
-              //addMessage(`⚡️ Updated threshold: ${parsed}%`);
-              if (isConnected) {
-                sendBLEData(`LEVEL${inputValue}`);
-              }
-            }
-
-            setInputValue('');
-            hideModal();
-          }}
+          onSave={thresholdSavedAction}
           onClose={() => {
             setInputValue('');
             hideModal();
           }}
+          isAutoMode={autoModeRef.current}
         />
       )}
 
@@ -144,45 +137,57 @@ const HomeScreen = () => {
         />
       )}
       <SafeAreaView style={{ flex: 1 }}>
-          <StatusBanner
-            visible={isPizzaMode}
-            threshold={lightThresholdRef.current}
-            uptime={uptime}
-            chargingStatus={chargingStatus}
-          />
+        <StatusBanner
+          visible={isPizzaMode}
+          threshold={lightThresholdRef.current}
+          autoMode={autoModeRef.current}
+          uptime={uptime}
+          chargingStatus={chargingStatus}
+        />
+        <ControlPanelGeneric
+          context={{ isConnected, isSubscribed, isPizzaMode }}
+          buttons={[
+            {
+              label: isPizzaMode ? 'Exit Pizza Mode' : '🍕 Pizza Mode',
+              action: pizzaModeButtonAction,
+              animated: true,
+              color: '#FFD700',
+              disabled: (ctx) => !ctx.isConnected,
+              row: 0, col: 0,
+            },
+            { label: 'Set Threshold', action: handleThresholdOpen, color: '#FFA500', disabled: false, row: 0, col: 1 },
+            { label: 'LED ON', action: wrap(sendBLEData, 'LED_ON'), color: '#005733', disabled: (ctx) => !ctx.isConnected, row: 1, col: 0 },
+            { label: 'LED OFF', action: wrap(sendBLEData, 'LED_OFF'), color: '#005733', disabled: (ctx) => !ctx.isConnected, row: 1, col: 1 },
+            { label: 'Scan', action: () => navigation.navigate('ConnectScreen', { deviceId: 'ABC123' }), color: '#00AAFF', row: 2, col: 0 },
+            {
+              label: !autoModeRef.current ? 'Auto On' : 'Auto Off',
+              action: () => {
+                sendBLEData(autoModeRef.current ? 'AUTO_MODE0' : 'AUTO_MODE1');
+                autoModeRef.current = !autoModeRef.current;
+                setIsPizzaMode(false); //if device receives 'AUTO_MODE0' or AUTO_MODE1' it will reset pizza mode.
+              },
+              animated: true,
+              id: 'auto_mode',
+              disabled: (ctx) => !ctx.isConnected,
+              color: '#FFA500',
+              row: 2, col: 1,
+            },
+          ]}
+        />
 
-          <ControlPanel
+        <View style={{ marginTop: 5, paddingHorizontal: 20, borderRadius: 55 }}>
+          <SystemStatus
             isConnected={isConnected}
             isSubscribed={isSubscribed}
-            isPizzaMode={isPizzaMode}
-            scaleAnim={scaleAnim}
-            onSendData={sendBLEData}
-            onSetThreshold={handleThresholdOpen}
-            onTogglePizzaMode={() => {
-              const nextMode = !isPizzaMode;
-              setIsPizzaMode(nextMode);
-              sendBLEData(nextMode ? 'P_MODE_ON' : 'P_MODE_OFF');
-              triggerAnimation();
-            }}
-
-            onScreenAction={{
-              action: () => navigation.navigate('ConnectScreen', { deviceId: 'ABC123' }),
-              label: 'Scan',
-            }}
+            threshold={lightThresholdRef.current}
+            rssi={rssi}
+            voltage={voltage}
+            lightLevel={lightLevel}
+            latestMessage={messages[messages.length - 1]}
+            connectedAt={connectedAt}
+            isAutoMode={autoModeRef.current}
           />
-
-          <View style={{ marginTop: 5, paddingHorizontal: 20, borderRadius: 55 }}>
-            <SystemStatus
-              isConnected={isConnected}
-              isSubscribed={isSubscribed}
-              threshold={lightThresholdRef.current}
-              rssi={rssi}
-              voltage={voltage}
-              lightLevel={lightLevel}
-              latestMessage={messages[messages.length - 1]}
-              connectedAt={connectedAt}
-            />
-          </View>
+        </View>
 
       </SafeAreaView></>
   );
