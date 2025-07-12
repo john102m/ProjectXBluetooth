@@ -47,6 +47,8 @@ const HomeScreen = () => {
     uptime,
     shouldAutoConnect,
     lastConnectedDevice,
+    savedThresholdValue,
+    setSavedThresholdValue,
     setIsPizzaMode,
     doConnect,
     sendBLEData,
@@ -83,10 +85,11 @@ const HomeScreen = () => {
   useEffect(() => {
     //const savedAddress = '94:A9:90:48:02:FA'; // 🧠 Could come from storage later
     console.log('Last connected device: ', lastConnectedDevice ?? 'Not found');
+    console.log('Last saved threshold: ', savedThresholdValue ?? 'Not found');
     if (!isConnected && lastConnectedDevice && shouldAutoConnect) {
       doConnect(lastConnectedDevice);
     }
-  }, [doConnect, isConnected, lastConnectedDevice, shouldAutoConnect]);
+  }, [doConnect, isConnected, lastConnectedDevice, savedThresholdValue, shouldAutoConnect]);
 
   const handleThresholdOpen = useCallback(() => {
     showModal('threshold');
@@ -103,6 +106,7 @@ const HomeScreen = () => {
     const parsed = parseFloat(inputValue);
     if (!isNaN(parsed)) {
       lightThresholdRef.current = parsed;
+      setSavedThresholdValue(`${inputValue}`);
       if (isConnected) {
         if (autoModeRef.current) {
           // Send as percentage multiplier e.g. "CALC80" = 80%
@@ -125,6 +129,7 @@ const HomeScreen = () => {
         <ThresholdModal
           visible={isModalVisible}
           inputValue={inputValue}
+          savedValue={parseInt(savedThresholdValue ?? '90', 10)}
           onChangeInput={setInputValue}
           onSave={thresholdSavedAction}
           onClose={() => {

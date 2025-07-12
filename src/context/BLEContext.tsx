@@ -12,6 +12,8 @@ type BLEContextType = {
         setShouldAutoConnect: (val: boolean) => void;  // <-- Changed here
         shouldAutoConnect: boolean;
         lastConnectedDevice: string | null;
+        savedThresholdValue: string | null;
+        setSavedThresholdValue: (val: string) => void;
 
     };
     modals: {
@@ -25,13 +27,16 @@ type BLEContextType = {
 
 const STORAGE_KEY = 'autoConnectEnabled';
 const LAST_DEVICE_KEY = 'lastConnectedDeviceAddress';
+const SAVED_THRESHOLD = 'savedThresholdValue';
 
 const BLEContext = createContext<BLEContextType | null>(null);
 
 export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     const [uptime, setUptime] = useState('—');
+
     const lightThresholdRef = useRef(80);
     const autoModeRef = useRef(true);
+    const [savedThresholdValue, _setSavedThresholdValue] = useState<string | null>(null);
     const [shouldAutoConnect, _setShouldAutoConnect] = useState(true);
     const [lastConnectedDevice, setLastConnectedDevice] = useState<string | null>(null);
 
@@ -50,18 +55,32 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     const ble = useBluetooth(lightThresholdRef, autoModeRef, handlePizzaAlert);
     const { connectedAt } = ble;
 
+    const _setSavedThresholdSilently = (val: string) => {
+        _setSavedThresholdValue(val); // no storage write
+    };
+
+    const setSavedThresholdValue = (val: string) => {
+        _setSavedThresholdValue(val);
+        AsyncStorage.setItem(SAVED_THRESHOLD, val).catch(e =>
+            console.warn('Failed to save threshold value', e)
+        );
+    };
     // Load persisted value once on mount
     useEffect(() => {
         (async () => {
             try {
                 const savedAutoConnect = await AsyncStorage.getItem(STORAGE_KEY);
                 const savedDevice = await AsyncStorage.getItem(LAST_DEVICE_KEY);
+                const savedThreshold = await AsyncStorage.getItem(SAVED_THRESHOLD);
 
                 if (savedAutoConnect !== null) {
                     _setShouldAutoConnect(savedAutoConnect === 'true');
                 }
                 if (savedDevice) {
                     setLastConnectedDevice(savedDevice);
+                }
+                if (savedThreshold) {
+                    _setSavedThresholdSilently(savedThreshold);
                 }
             } catch (e) {
                 console.warn('Failed to load persisted settings', e);
@@ -103,6 +122,8 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
             shouldAutoConnect,
             setShouldAutoConnect,
             lastConnectedDevice,
+            savedThresholdValue,
+            setSavedThresholdValue,
         },
         modals: {
             showModal,

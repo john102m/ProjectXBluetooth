@@ -10,11 +10,13 @@ type Props = {
   onSave: () => void;
   onClose: () => void;
   isAutoMode: boolean; // 👈 New prop!
+  savedValue: number;
 };
 
 export default function ThresholdModal({
   visible,
   inputValue,
+  savedValue,
   onChangeInput,
   onSave,
   onClose,
@@ -33,8 +35,8 @@ export default function ThresholdModal({
 
           <Text style={styles.sliderLabel}>
             {isAutoMode
-              ? `Ambient: ${inputValue || '50'}%`
-              : `Absolute: ${inputValue || '50'}%`}
+              ? `Ambient: ${inputValue || savedValue }%`
+              : `Absolute: ${inputValue || savedValue}%`}
           </Text>
           <Slider
             // eslint-disable-next-line react-native/no-inline-styles
@@ -42,7 +44,7 @@ export default function ThresholdModal({
             minimumValue={1}
             maximumValue={100}
             step={1}
-            value={parseFloat(inputValue) || 50}
+            value={parseFloat(inputValue) || savedValue}
             onValueChange={(val) => onChangeInput(val.toString())}
             minimumTrackTintColor="#FFA500"
             thumbTintColor="#FFD700"
