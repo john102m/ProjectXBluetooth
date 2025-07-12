@@ -81,6 +81,10 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
                 }
                 if (savedThreshold) {
                     _setSavedThresholdSilently(savedThreshold);
+                    const parsed = parseFloat(savedThreshold);
+                    if (!isNaN(parsed)) {
+                        lightThresholdRef.current = parsed; // ✅ Apply to the ref too
+                    }
                 }
             } catch (e) {
                 console.warn('Failed to load persisted settings', e);
@@ -98,6 +102,8 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     useEffect(() => {
+        const sourceId = Math.random().toString(36).substring(2, 6);
+        console.log(`[UptimeEffect ${sourceId}] connectedAt =`, connectedAt);
         let timer: ReturnType<typeof setInterval>;
 
         if (connectedAt) {
@@ -112,6 +118,11 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
             setUptime('—');
         };
     }, [connectedAt]);
+
+    useEffect(() => {
+        console.log('[BLEProvider] mounted');
+        return () => console.log('[BLEProvider] unmounted');
+    }, []);
 
     const value: BLEContextType = {
         ble: {
