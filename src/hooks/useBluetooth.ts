@@ -152,7 +152,7 @@ export default function useBluetooth(
 
     const handleDisconnection = useCallback(() => {
         setDisconnected();
-        playAlertSound('bing_bong');
+        playAlertSound('disconnected');
     }, [setDisconnected]);
 
     const handleCharacteristicFound = useCallback(() => {
