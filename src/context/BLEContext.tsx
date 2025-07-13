@@ -53,7 +53,11 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     }, [showModal, hideModal]);
 
     const ble = useBluetooth(lightThresholdRef, autoModeRef, handlePizzaAlert);
-    const { connectedAt } = ble;
+    const {
+        connection: {
+            connectedAt,
+        },
+    } = ble;
 
     const _setSavedThresholdSilently = (val: string) => {
         _setSavedThresholdValue(val); // no storage write
