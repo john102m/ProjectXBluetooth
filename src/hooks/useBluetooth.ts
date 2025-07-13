@@ -83,6 +83,7 @@ export default function useBluetooth(
         setIsSubscribed,
         foundDevices,
         setFoundDevices,
+        setConnectedAt,
         clearFoundDevices,
     } = useBLEManager(addMessage);
 
@@ -146,9 +147,10 @@ export default function useBluetooth(
 
     const setDisconnected = useCallback(() => {
         setIsSubscribed(false);
+        setConnectedAt(null);
         setIsConnected(false);
         logDisconnection();
-    }, [logDisconnection, setIsConnected, setIsSubscribed]);
+    }, [logDisconnection, setConnectedAt, setIsConnected, setIsSubscribed]);
 
     const handleDisconnection = useCallback(() => {
         setDisconnected();

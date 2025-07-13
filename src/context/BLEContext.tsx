@@ -104,6 +104,7 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     useEffect(() => {
         const sourceId = Math.random().toString(36).substring(2, 6);
         console.log(`[UptimeEffect ${sourceId}] connectedAt =`, connectedAt);
+
         let timer: ReturnType<typeof setInterval>;
 
         if (connectedAt) {
@@ -111,13 +112,16 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
                 const elapsed = Math.floor((Date.now() - connectedAt.getTime()) / 1000);
                 setUptime(formatDuration(elapsed));
             }, 1000);
+        } else {
+            setUptime('—');
         }
 
         return () => {
-            if (timer) { clearInterval(timer); }
-            setUptime('—');
+            console.log(`[UptimeEffect ${sourceId}] cleaning up timer`);
+            clearInterval(timer);
         };
     }, [connectedAt]);
+
 
     useEffect(() => {
         console.log('[BLEProvider] mounted');
