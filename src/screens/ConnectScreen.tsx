@@ -36,20 +36,15 @@ const ConnectScreen = () => {
       lightThresholdRef,
       chargingStatus,
     },
-    // If you still have these in ble
-    shouldAutoConnect,
-    setShouldAutoConnect,
-    uptime,
-    autoModeRef,
+    context: {
+      shouldAutoConnect,
+      setShouldAutoConnect,
+      uptime,
+      autoModeRef,
+    },
+
   } = ble;
 
-
-
-  // useEffect(() => {
-  //   clearFoundDevices();
-  //   return () => clearFoundDevices();
-  // // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, []);
 
   return (
     <SafeAreaView style={{ flex: 1 }}>

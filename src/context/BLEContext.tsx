@@ -6,14 +6,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type BLEContextType = {
     ble: ReturnType<typeof useBluetooth> & {
-        lightThresholdRef: React.RefObject<number>;
-        autoModeRef: React.RefObject<boolean>;
-        uptime: string;
-        setShouldAutoConnect: (val: boolean) => void;  // <-- Changed here
-        shouldAutoConnect: boolean;
-        lastConnectedDevice: string | null;
-        savedThresholdValue: string | null;
-        setSavedThresholdValue: (val: string) => void;
+        context: {
+            lightThresholdRef: React.RefObject<number>;
+            autoModeRef: React.RefObject<boolean>;
+            uptime: string;
+            setShouldAutoConnect: (val: boolean) => void;  // <-- Changed here
+            shouldAutoConnect: boolean;
+            lastConnectedDevice: string | null;
+            savedThresholdValue: string | null;
+            setSavedThresholdValue: (val: string) => void;
+        }
+
 
     };
     modals: {
@@ -135,14 +138,18 @@ export const BLEProvider = ({ children }: { children: React.ReactNode }) => {
     const value: BLEContextType = {
         ble: {
             ...ble,
-            lightThresholdRef,
-            autoModeRef,
-            uptime,
-            shouldAutoConnect,
-            setShouldAutoConnect,
-            lastConnectedDevice,
-            savedThresholdValue,
-            setSavedThresholdValue,
+            context: {
+                lightThresholdRef,
+                autoModeRef,
+                uptime,
+                shouldAutoConnect,
+                setShouldAutoConnect,
+                lastConnectedDevice,
+                savedThresholdValue,
+                setSavedThresholdValue,
+
+            },
+
         },
         modals: {
             showModal,

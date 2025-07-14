@@ -234,23 +234,29 @@ export default function useBLEManager(addMessage: (msg: string) => void) {
   }, [disconnectBLE, doUnsubscribe]);
 
   return {
+  connection: {
     isConnected,
-    isSubscribed,
+    setIsConnected,
     connectedAt,
+    setConnectedAt,
     doConnect,
     disconnectBLE,
-    sendBLEData,
+    logDisconnection,
+  },
+  subscription: {
+    isSubscribed,
+    setIsSubscribed,
     doSubscribe,
     doUnsubscribe,
-    setIsConnected,
-    setConnectedAt,
-    logDisconnection,
-    setIsSubscribed,
-    resetBLE,
+    sendBLEData,
+  },
+  scanning: {
     scanBLEDevices,
     stopBLEScan,
     foundDevices,
-    setFoundDevices,
+    //setFoundDevices,
     clearFoundDevices,
+  },
+  resetBLE,
   };
 }

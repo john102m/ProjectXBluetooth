@@ -33,25 +33,37 @@ const HomeScreen = () => {
   const { ble, modals } = useBLE();
 
   const {
-    isConnected,
-    isSubscribed,
-    messages,
-    voltage,
-    rssi,
-    lightLevel,
-    isPizzaMode,
-    connectedAt,
-    chargingStatus,
-    lightThresholdRef,
-    autoModeRef,
-    uptime,
-    shouldAutoConnect,
-    lastConnectedDevice,
-    savedThresholdValue,
-    setSavedThresholdValue,
-    setIsPizzaMode,
-    doConnect,
-    sendBLEData,
+    connection: {
+      isConnected,
+      connectedAt,
+      doConnect,
+      voltage,
+      rssi,
+    },
+    subscription: {
+      isSubscribed,
+      sendBLEData,
+      messages,
+    },
+
+    deviceStatus: {
+      chargingStatus,
+      setIsPizzaMode,
+      isPizzaMode,
+      lightLevel,
+      lightThresholdRef,
+
+    },
+    context: {
+      autoModeRef,
+      uptime,
+      shouldAutoConnect,
+      lastConnectedDevice,
+      savedThresholdValue,
+      setSavedThresholdValue,
+    },
+
+
   } = ble;
 
   const {

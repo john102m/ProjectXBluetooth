@@ -68,23 +68,26 @@ export default function useBluetooth(
     const [isPizzaMode, setIsPizzaMode] = useState(false);
     const [chargingStatus, setChargingStatus] = useState<boolean | null>(null);
 
-    const { isConnected,
-        connectedAt,
-        doConnect,
-        setIsConnected,
-        logDisconnection,
-        disconnectBLE,
-        sendBLEData,
-        scanBLEDevices,
-        stopBLEScan,
-        isSubscribed,
-        doSubscribe,
-        doUnsubscribe,
-        setIsSubscribed,
-        foundDevices,
-        setFoundDevices,
-        setConnectedAt,
-        clearFoundDevices,
+    const {
+        connection: {
+            isConnected,
+            connectedAt,
+            doConnect,
+            setIsConnected,
+            setConnectedAt,
+            logDisconnection,
+            disconnectBLE,
+        },
+        subscription: {
+            isSubscribed,
+            doSubscribe,
+            doUnsubscribe,
+            setIsSubscribed,
+            sendBLEData,
+        },
+
+        scanning,
+
     } = useBLEManager(addMessage);
 
     const sendAlert = useCallback(() => {
@@ -223,14 +226,6 @@ export default function useBluetooth(
             sendBLEData,
         },
 
-        scanning: {
-            foundDevices,
-            scanBLEDevices,
-            stopBLEScan,
-            setFoundDevices,
-            clearFoundDevices,
-        },
-
         deviceStatus: {
             isPizzaMode,
             setIsPizzaMode,
@@ -238,6 +233,9 @@ export default function useBluetooth(
             lightLevel: lightLevelValue,
             lightThresholdRef,
         },
+
+        scanning,
+
     };
 }
 
