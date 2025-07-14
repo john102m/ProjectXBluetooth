@@ -205,28 +205,39 @@ export default function useBluetooth(
     }, [handleCharacteristicFound, handleDisconnection, processDeviceMessage]);
 
     return {
-        isConnected,
-        isSubscribed,
-        messages,
-        isPizzaMode,
-        chargingStatus,
-        setIsPizzaMode,
-        doConnect,
-        doSubscribe,
-        doUnsubscribe,
-        disconnectBLE,
-        sendBLEData,
-        scanBLEDevices,
-        stopBLEScan,
-        foundDevices,
-        setFoundDevices,
-        clearFoundDevices,
-        addMessage,
-        voltage: voltageLevel,
-        rssi: rssiLevel,
-        lightLevel: lightLevelValue,
-        connectedAt,
-        lightThresholdRef,
+        connection: {
+            isConnected,
+            connectedAt,
+            rssi: rssiLevel,
+            voltage: voltageLevel,
+            doConnect,
+            disconnectBLE,
+        },
+
+        subscription: {
+            isSubscribed,
+            messages,
+            addMessage,
+            doSubscribe,
+            doUnsubscribe,
+            sendBLEData,
+        },
+
+        scanning: {
+            foundDevices,
+            scanBLEDevices,
+            stopBLEScan,
+            setFoundDevices,
+            clearFoundDevices,
+        },
+
+        deviceStatus: {
+            isPizzaMode,
+            setIsPizzaMode,
+            chargingStatus,
+            lightLevel: lightLevelValue,
+            lightThresholdRef,
+        },
     };
 }
 

@@ -16,24 +16,33 @@ const ConnectScreen = () => {
   const { ble } = useBLE();
 
   const {
-    isConnected,
-    isSubscribed,
-    isPizzaMode,
-    lightThresholdRef,
-    autoModeRef,
-    chargingStatus,
-    doConnect,
-    disconnectBLE,
+    connection: {
+      isConnected,
+      doConnect,
+      disconnectBLE,
+    },
+    subscription: {
+      isSubscribed,
+      doSubscribe,
+    },
+    scanning: {
+      scanBLEDevices,
+      stopBLEScan,
+      foundDevices,
+      clearFoundDevices,
+    },
+    deviceStatus: {
+      isPizzaMode,
+      lightThresholdRef,
+      chargingStatus,
+    },
+    // If you still have these in ble
     shouldAutoConnect,
     setShouldAutoConnect,
-    doSubscribe,
-    scanBLEDevices,
-    stopBLEScan,
     uptime,
-    foundDevices,
-    clearFoundDevices,
-    //setFoundDevices,
+    autoModeRef,
   } = ble;
+
 
 
   // useEffect(() => {
